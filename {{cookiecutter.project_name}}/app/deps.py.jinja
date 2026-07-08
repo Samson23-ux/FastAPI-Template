@@ -139,13 +139,13 @@ async def get_current_user(
         user: User = await user_service.get_user_by_email(
             email=user_email, is_verified=True
         )
-    {% if cookiecutter.use_github == "yes" %}
+    {% if cookiecutter.auth_with_github == "yes" %}
     elif user_type == "github":
         user: User = await user_service.get_user_by_email(
             github_email=user_email, is_verified=True
         )
     {% endif %}
-    {% if cookiecutter.use_google == "yes" %}
+    {% if cookiecutter.auth_with_google == "yes" %}
     else:
         user: User = await user_service.get_user_by_email(
             google_email=user_email, is_verified=True

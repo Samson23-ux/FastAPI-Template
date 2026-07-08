@@ -22,13 +22,13 @@ class UserBase(BaseModel):
 class GoogleUser(UserBase):
     google_id: Optional[str] = None
     google_email: Optional[EmailStr] = None
-{& endif &}
+{% endif %}
 
 {% if use_github %}
 class GithubUser(UserBase):
     github_id: Optional[str] = None
     github_email: Optional[EmailStr] = None
-{& endif &}
+{% endif %}
 
 
 class EmailUser(UserBase):

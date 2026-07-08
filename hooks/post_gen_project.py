@@ -4,7 +4,7 @@ from pathlib import Path
 
 if "{{ cookiecutter.make_http_requests }}" == "no":
     path = (
-        Path(__file__).parent
+        Path(__file__).parent.parent
         / "{{ cookiecutter.project_name }}"
         / "app"
         / "api"
@@ -13,4 +13,4 @@ if "{{ cookiecutter.make_http_requests }}" == "no":
     )
     os.remove(path)
 
-subprocess.run(["uv" "sync"])
+subprocess.run(["uv", "sync"])
