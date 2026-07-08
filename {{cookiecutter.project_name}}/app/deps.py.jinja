@@ -1,4 +1,6 @@
+{% if cookiecutter.make_http_requests == "yes" %}
 import httpx
+{% endif %}
 from typing import Annotated
 from redis.asyncio import Redis
 from fastapi import Depends, Request

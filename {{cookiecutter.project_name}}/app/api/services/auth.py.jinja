@@ -41,8 +41,8 @@ from app.core.exceptions import (
     ServerError,
     CredentialError,
     AuthenticationError,
-    AuthorizationError,
     {% if cookiecutter.auth_with_github == "yes" %}
+    AuthorizationError,
     UnverifiedEmailError,
     {% endif %}
 )

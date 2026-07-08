@@ -5,7 +5,9 @@ from fastapi import APIRouter, Request, Response
 
 from app.limiter import limiter
 from app.core.config import get_settings
+{% if cookiecutter.auth_with_github == "yes" %}
 from app.core.exceptions import AuthorizationError
+{% endif %}
 from app.api.schemas.response import SuccessResponse
 from app.api.schemas.user import (
     GoogleUserResponse,
@@ -297,7 +299,7 @@ async def create_new_token(
     status_code=200,
     description="Get current active user",
     response_model=SuccessResponse[
-        EmailUserResponse | GoogleUserResponse | GithubUserResponse
+        EmailUserResponse{% if cookiecutter.auth_with_google == "yes" %} | GoogleUserResponse{% endif %}{% if cookiecutter.auth_with_github == "yes" %} | GithubUserResponse{% endif %}
     ],
 )
 @limiter.limit("3/5minute")
@@ -306,7 +308,7 @@ async def get_current_user(
     curr_user: CurrentActiveUser,
     auth_service: AuthServiceDep,
 ):
-    user: EmailUserResponse | GoogleUserResponse | GithubUserResponse = (
+    user: EmailUserResponse{% if cookiecutter.auth_with_google == "yes" %} | GoogleUserResponse{% endif %}{% if cookiecutter.auth_with_github == "yes" %} | GithubUserResponse{% endif %} = (
         await auth_service.get_current_user(curr_user)
     )
     return SuccessResponse(message="User retrieved successfully", data=user)

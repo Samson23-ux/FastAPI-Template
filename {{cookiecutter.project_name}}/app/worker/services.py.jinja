@@ -1,4 +1,6 @@
+{% if cookiecutter.make_http_requests == "yes" %}
 from httpx import Client
+{% endif %}
 
 
 from app.core.config import get_settings

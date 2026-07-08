@@ -18,4 +18,11 @@ sentry_sdk.init(
 )
 
 
+celery_app = Celery(
+    main="celery_app",
+    broker=SETTINGS.BROKER_URL,
+    backend=SETTINGS.REDIS_URL,
+)
+
+
 celery_app.config_from_object("app.worker.celeryconfig")

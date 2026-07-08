@@ -1,6 +1,8 @@
+{% if cookiecutter.auth_with_github == "yes" %}
 import json
 import base64
 import itsdangerous
+{% endif %}
 import pytest_asyncio
 from uuid import uuid7
 from sqlalchemy import text

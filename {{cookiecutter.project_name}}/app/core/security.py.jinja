@@ -1,8 +1,12 @@
+{% if cookiecutter.auth_with_google == "yes" %}
 import os
 import hmac
+{% endif %}
 import json
 import base64
+{% if cookiecutter.auth_with_google == "yes" %}
 import hashlib
+{% endif %}
 from uuid import uuid4
 from typing import Optional
 from jose import jwt, JWTError
