@@ -46,6 +46,7 @@ class UserInDB(GithubUser, EmailUser):
 {% else %}
 class UserInDB(EmailUser):
     hashed_password: Optional[str] = None
+{% endif %}
 
 {% if use_google %}
 class GoogleUserResponse(GoogleUser):
