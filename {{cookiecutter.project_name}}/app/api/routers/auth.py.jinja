@@ -1,3 +1,6 @@
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+
 from uuid import uuid4
 from fastapi.responses import RedirectResponse
 from fastapi import APIRouter, Request, Response
@@ -5,14 +8,16 @@ from fastapi import APIRouter, Request, Response
 
 from app.limiter import limiter
 from app.core.config import get_settings
-{% if cookiecutter.auth_with_github == "yes" %}
+{% if use_github %}
 from app.core.exceptions import AuthorizationError
 {% endif %}
 from app.api.schemas.response import SuccessResponse
 from app.api.schemas.user import (
+    {% if use_google == "yes" %}
     GoogleUserResponse,
+    {% endif %}
     EmailUserResponse,
-    {% if cookiecutter.auth_with_github == "yes" %}
+    {% if use_github %}
     GithubUserResponse,
     {% endif %}
 )
@@ -68,7 +73,7 @@ async def sign_up_with_email(
         )
     )
 
-{% if cookiecutter.auth_with_google == "yes" %}
+{% if use_google == "yes" %}
 @router.get(
     "/auth/google",
     status_code=302,
@@ -115,7 +120,7 @@ async def google_callback(
     return SuccessResponse(data=Token(access_token=access_token))
 {% endif %}
 
-{% if cookiecutter.auth_with_github == "yes" %}
+{% if use_github %}
 @router.get(
     "/auth/github",
     status_code=302,
@@ -299,7 +304,7 @@ async def create_new_token(
     status_code=200,
     description="Get current active user",
     response_model=SuccessResponse[
-        EmailUserResponse{% if cookiecutter.auth_with_google == "yes" %} | GoogleUserResponse{% endif %}{% if cookiecutter.auth_with_github == "yes" %} | GithubUserResponse{% endif %}
+        EmailUserResponse{% if use_google == "yes" %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif %}
     ],
 )
 @limiter.limit("3/5minute")
@@ -308,7 +313,7 @@ async def get_current_user(
     curr_user: CurrentActiveUser,
     auth_service: AuthServiceDep,
 ):
-    user: EmailUserResponse{% if cookiecutter.auth_with_google == "yes" %} | GoogleUserResponse{% endif %}{% if cookiecutter.auth_with_github == "yes" %} | GithubUserResponse{% endif %} = (
+    user: EmailUserResponse{% if use_google == "yes" %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif %} = (
         await auth_service.get_current_user(curr_user)
     )
     return SuccessResponse(message="User retrieved successfully", data=user)

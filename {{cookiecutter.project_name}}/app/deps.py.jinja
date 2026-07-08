@@ -1,4 +1,6 @@
-{% if cookiecutter.make_http_requests == "yes" %}
+{% set use_http = cookiecutter.make_http_requests == "yes" %}
+
+{% if use_http %}
 import httpx
 {% endif %}
 from typing import Annotated
@@ -22,7 +24,7 @@ from app.api.repo.redis import RedisRepository
 from app.api.services.email import EmailService
 from app.api.repo.uow import UnitOfWorkRepository
 from app.core.exceptions import AuthenticationError
-{% if cookiecutter.make_http_requests == "yes" %}
+{% if use_http %}
 from app.api.services.request import Request as HttpRequest
 {% endif %}
 
@@ -52,7 +54,7 @@ async def get_security() -> Security:
 SecurityDep = Annotated[Security, Depends(get_security)]
 
 
-{% if cookiecutter.make_http_requests == "yes" %}
+{% if use_http %}
 # ------------------- Request dependency ------------------------------ #
 async def get_request(request: Request) -> HttpRequest:
     client: httpx.AsyncClient = request.app.state.client

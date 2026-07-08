@@ -1,7 +1,11 @@
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+{% set use_http = cookiecutter.make_http_requests == "yes" %}
+
 import sentry_sdk
 from uuid import uuid7, UUID
 import sentry_sdk.logger as sentry_logger
-{% if cookiecutter.make_http_requests == "yes" %}
+{% if use_http %}
 from httpx import Response, HTTPStatusError
 {% endif %}
 
@@ -12,7 +16,7 @@ from app.core.security import Security
 from app.core.config import get_settings
 from app.api.repo.otp import OtpRepository
 from app.api.schemas.email import EmailInDB
-{% if cookiecutter.make_http_requests == "yes" %}
+{% if use_http %}
 from app.api.services.request import Request
 {% endif %}
 from app.api.repo.user import UserRepository
@@ -24,8 +28,10 @@ from app.worker.tasks.email import send_verification_email
 from app.api.schemas.user import (
     UserInDB,
     EmailUserResponse,
+    {% if use_github %}
     GoogleUserResponse,
-    {% if cookiecutter.auth_with_github == "yes" %}
+    {% endif %}
+    {% if use_github %}
     GithubUserResponse,
     {% endif %}
 )
@@ -41,15 +47,11 @@ from app.core.exceptions import (
     ServerError,
     CredentialError,
     AuthenticationError,
-    {% if cookiecutter.auth_with_github == "yes" %}
+    {% if use_github %}
     AuthorizationError,
     UnverifiedEmailError,
     {% endif %}
 )
-
-
-{% set use_google = cookiecutter.auth_with_google == "yes" %}
-{% set use_github = cookiecutter.auth_with_github == "yes" %}
 
 
 class AuthService:
@@ -209,7 +211,7 @@ class AuthService:
 
         return access_token, refresh_token
     {% endif %}
-    {% if use_github == "yes" %}
+    {% if use_github %}
     async def sign_up_with_github(
         self,
         code: str,

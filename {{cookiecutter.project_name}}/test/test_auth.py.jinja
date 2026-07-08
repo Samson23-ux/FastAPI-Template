@@ -1,3 +1,5 @@
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+
 import httpx
 import pytest
 import secrets
@@ -5,9 +7,10 @@ from uuid import uuid4
 from datetime import datetime, timedelta
 from unittest.mock import patch, AsyncMock, MagicMock
 
-
+{% if use_google %}
 from app.main import app
 from app.deps import get_security
+{% endif %}
 from app.core.security import Security
 
 
@@ -123,7 +126,7 @@ class TestLogin:
 
         assert res.status_code == 400
 
-{% if cookiecutter.auth_with_google == "yes" %}
+{% if use_google %}
 class TestSignUpWithGoogle:
     @pytest.mark.asyncio
     async def test_sign_in_google(self, async_client: httpx.AsyncClient):

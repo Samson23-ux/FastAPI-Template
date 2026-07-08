@@ -1,5 +1,9 @@
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+
 from typing import Any
+{% if use_google %}
 from sqlalchemy import and_
+{% endif %}
 
 
 from app.api.models.user import User
@@ -19,7 +23,7 @@ class UserRepository(BaseRepository[UserBase, User]):
 
         if "email" in filters:
             filter_conditions.append(self.model.email == filters["email"])
-        {% if cookiecutter.auth_with_google == "yes" %}
+        {% if use_google %}
         if "google_email" in filters:
             filter_conditions.append(self.model.google_email == filters["google_email"])
         {% endif %}

@@ -1,10 +1,12 @@
-{% if cookiecutter.auth_with_google == "yes" %}
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
+
+{% if use_github %}
 import os
-import hmac
 {% endif %}
 import json
 import base64
-{% if cookiecutter.auth_with_google == "yes" %}
+{% if use_github %}
 import hashlib
 {% endif %}
 from uuid import uuid4
@@ -13,15 +15,13 @@ from jose import jwt, JWTError
 from binascii import Error as binascii_error
 from pwdlib.hashers.argon2 import Argon2Hasher
 from datetime import datetime, timezone, timedelta
+{% if use_google %}
 from authlib.integrations.starlette_client import OAuth
+{% endif %}
 
 
 from app.core.config import get_settings
 from app.api.schemas.auth import TokenData
-
-
-{% set use_google = cookiecutter.auth_with_google == "yes" %}
-{% set use_github = cookiecutter.auth_with_github == "yes" %}
 
 
 class Security:

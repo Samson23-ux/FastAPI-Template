@@ -1,4 +1,5 @@
-{% if cookiecutter.auth_with_github == "yes" %}
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
+{% if use_github %}
 import json
 import base64
 import itsdangerous
@@ -27,7 +28,6 @@ from app.api.models.otp import Otp
 from app.api.models.base import Base
 from app.core.config import get_settings
 from app.api import models  # noqa: F401
-from app.worker.celery_app import celery_app
 {% if cookiecutter.make_http_requests == "yes" %}
 from app.api.services.request import Request
 {% endif %}
@@ -237,7 +237,7 @@ async def login(async_client: AsyncClient, verify_user: Response):
 
     return res
 
-{% if cookiecutter.auth_with_github == "yes" %}
+{% if use_github %}
 @pytest_asyncio.fixture
 async def sign_in_with_github(async_client: AsyncClient):
     sign_in_res: Response = await async_client.get(

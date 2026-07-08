@@ -1,3 +1,6 @@
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
+{% set use_http = cookiecutter.make_http_requests == "yes" %}
+
 from fastapi import FastAPI
 
 
@@ -11,13 +14,13 @@ from app.core.exceptions import (
     CredentialError,
     AuthorizationError,
     ServiceUnavailable,
+    {% if use_http %}
+    CheckTimeoutError,
+    {% endif %}
+    {% if use_github %}
+    UnverifiedEmailError,
+    {% endif %}
 )
-{% if cookiecutter.make_http_requests == "yes" %}
-from app.core.exceptions import CheckTimeoutError
-{% endif %}
-{% if cookiecutter.auth_with_github == "yes" %}
-from app.core.exceptions import UnverifiedEmailError
-{% endif %}
 
 
 class ExceptionHandler:
@@ -113,7 +116,7 @@ class ExceptionHandler:
             ),
         )
 
-        {% if cookiecutter.make_http_requests == "yes" %}
+        {% if use_http %}
         self._app.add_exception_handler(
             CheckTimeoutError,
             create_exception_handler(
@@ -126,7 +129,7 @@ class ExceptionHandler:
         )
         {% endif %}
 
-        {% if cookiecutter.auth_with_github == "yes" %}
+        {% if use_github %}
         self._app.add_exception_handler(
             exc_class_or_status_code=UnverifiedEmailError,
             handler=create_exception_handler(
