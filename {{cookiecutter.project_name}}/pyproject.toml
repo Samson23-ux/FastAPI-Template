@@ -1,0 +1,27 @@
+[project]
+name = "notix"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "alembic",
+    "asgi-lifespan",
+    "asyncpg",
+    {% if cookiecutter.auth_with_google == "yes" %}
+    "authlib",
+    {% endif %}
+    "celery",
+    "fastapi[all]",
+    "gevent",
+    "psycopg",
+    "psycopg2",
+    "pwdlib[argon2]",
+    "pytest",
+    "pytest-asyncio",
+    "python-jose",
+    "redis",
+    "resend",
+    "slowapi",
+    "sqlalchemy",
+]
