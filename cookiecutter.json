@@ -1,6 +1,6 @@
 {
     "project_name": "FastAPI Template",
-    "project_slug": "{{cookiecutter.project_name.lower()}.replace(' ', '-')}",
+    "project_slug": "{{ cookiecutter.project_name.lower().replace(' ', '-') }}",
     "author_name": "Samson",
     "python_version": "3.14",
     "api_title": "My API",
