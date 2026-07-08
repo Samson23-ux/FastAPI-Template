@@ -4,7 +4,9 @@ from httpx import Client
 from app.core.config import get_settings
 from app.api.repo.otp import OtpRepository
 from app.api.services.otp import OtpService
+{% if cookiecutter.make_http_requests == "yes" %}
 from app.api.services.request import Request
+{% endif %}
 from app.api.repo.user import UserRepository
 from app.api.services.user import UserService
 from app.api.repo.email import EmailRepository

@@ -26,10 +26,19 @@ from app.api.models.base import Base
 from app.core.config import get_settings
 from app.api import models  # noqa: F401
 from app.worker.celery_app import celery_app
+{% if cookiecutter.make_http_requests == "yes" %}
 from app.api.services.request import Request
+{% endif %}
 from app.api.services.auth import AuthService
 from app.api.repo.redis import RedisRepository
-from app.deps import get_session, get_auth_service, get_redis_client, get_request
+from app.deps import (
+    get_session,
+    get_auth_service,
+    get_redis_client,
+    {% if cookiecutter.make_http_requests == "yes" %}
+    get_request
+    {% endif %}
+)
 
 
 @pytest_asyncio.fixture(scope="session")

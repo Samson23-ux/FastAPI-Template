@@ -10,10 +10,14 @@ from app.api.schemas.response import SuccessResponse
 from app.api.schemas.user import (
     GoogleUserResponse,
     EmailUserResponse,
+    {% if cookiecutter.auth_with_github == "yes" %}
     GithubUserResponse,
+    {% endif %}
 )
 from app.deps import (
+    {% if cookiecutter.make_http_requests == "yes" %}
     RequestDep,
+    {% endif %}
     SecurityDep,
     AuthServiceDep,
     UserServiceDep,

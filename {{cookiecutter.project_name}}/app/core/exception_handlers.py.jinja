@@ -113,6 +113,7 @@ class ExceptionHandler:
             ),
         )
 
+        {% if cookiecutter.make_http_requests == "yes" %}
         self._app.add_exception_handler(
             CheckTimeoutError,
             create_exception_handler(
@@ -123,7 +124,9 @@ class ExceptionHandler:
                 status_code=408,
             ),
         )
+        {% endif %}
 
+        {% if cookiecutter.auth_with_github == "yes" %}
         self._app.add_exception_handler(
             exc_class_or_status_code=UnverifiedEmailError,
             handler=create_exception_handler(
@@ -134,3 +137,4 @@ class ExceptionHandler:
                 },
             ),
         )
+        {% endif %}

@@ -1,28 +1,33 @@
 import sentry_sdk
 from uuid import uuid7, UUID
 import sentry_sdk.logger as sentry_logger
+{% if cookiecutter.make_http_requests == "yes" %}
 from httpx import Response, HTTPStatusError
+{% endif %}
 
 
 from app.api.models.otp import Otp
-from app.util import get_user_email
 from app.api.models.user import User
 from app.core.security import Security
 from app.core.config import get_settings
 from app.api.repo.otp import OtpRepository
 from app.api.schemas.email import EmailInDB
+{% if cookiecutter.make_http_requests == "yes" %}
 from app.api.services.request import Request
+{% endif %}
 from app.api.repo.user import UserRepository
 from app.api.services.user import UserService
 from app.api.repo.redis import RedisRepository
 from app.api.services.email import EmailService
+from app.api.repo.uow import UnitOfWorkRepository
 from app.worker.tasks.email import send_verification_email
-from app.api.repo.unit_of_work import UnitOfWorkRepository
 from app.api.schemas.user import (
     UserInDB,
     EmailUserResponse,
     GoogleUserResponse,
+    {% if cookiecutter.auth_with_github == "yes" %}
     GithubUserResponse,
+    {% endif %}
 )
 from app.api.schemas.auth import (
     EmailLogin,
@@ -37,7 +42,9 @@ from app.core.exceptions import (
     CredentialError,
     AuthenticationError,
     AuthorizationError,
+    {% if cookiecutter.auth_with_github == "yes" %}
     UnverifiedEmailError,
+    {% endif %}
 )
 
 

@@ -18,8 +18,8 @@ from app.api.services.user import UserService
 from app.api.repo.email import EmailRepository
 from app.api.repo.redis import RedisRepository
 from app.api.services.email import EmailService
+from app.api.repo.uow import UnitOfWorkRepository
 from app.core.exceptions import AuthenticationError
-from app.api.repo.unit_of_work import UnitOfWorkRepository
 {% if cookiecutter.make_http_requests == "yes" %}
 from app.api.services.request import Request as HttpRequest
 {% endif %}

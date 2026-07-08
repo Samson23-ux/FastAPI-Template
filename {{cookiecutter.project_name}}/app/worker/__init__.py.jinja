@@ -3,11 +3,11 @@ from app.worker.db import get_db_session, get_redis_client
 from app.worker.services import (
     get_redis_repo,
     get_otp_service,
-    get_email_service
+    get_email_service,
+    {% if cookiecutter.make_http_requests == "yes" %}
+    get_request_service,
+    {% endif %}
 )
-{% if cookiecutter.make_http_requests == "yes" %}
-from app.worker.services import get_request_service
-{% endif %}
 from app.worker.tasks.base import BaseTaskWithFailure
 
 __all__ = [
@@ -17,8 +17,8 @@ __all__ = [
     "get_otp_service",
     "get_redis_client",
     "get_email_service",
+    {% if cookiecutter.make_http_requests == "yes" %}
+    "get_request_service",
+    {% endif %}
     "BaseTaskWithFailure",
 ]
-{% if cookiecutter.make_http_requests == "yes" %}
-__all__.append("get_request_service")
-{% endif %}
