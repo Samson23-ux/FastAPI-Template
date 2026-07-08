@@ -1,10 +1,14 @@
+{% set oauth_supported = cookiecutter.auth_with_google == "yes" or cookiecutter.auth_with_github == "yes" %}
+
 import sentry_sdk
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi import _rate_limit_exceeded_handler
+{% if oauth_supported %}
 from starlette.middleware.sessions import SessionMiddleware
+{% endif %}
 
 
 from app.limiter import limiter
@@ -16,9 +20,6 @@ from app.core.exception_handlers import ExceptionHandler
 
 SECURITY = Security()
 SETTINGS = get_settings()
-
-
-{% set oauth_supported = cookiecutter.auth_with_google == "yes" or cookiecutter.auth_with_github == "yes" %}
 
 
 sentry_sdk.init(

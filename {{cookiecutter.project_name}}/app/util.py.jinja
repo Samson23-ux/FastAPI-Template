@@ -1,14 +1,17 @@
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+
 from app.api.models.user import User
 
 
 def get_user_email(user: User) -> str:
     if user.type == "email":
         user_email: str = user.email
-    {% if cookiecutter.auth_with_github == "yes" %}
+    {% if use_github %}
     elif user.type == "github":
         user_email: str = user.github_email
     {% endif %}
-    {% if cookiecutter.auth_with_google == "yes" %}
+    {% if use_google %}
     else:
         user_email: str = user.google_email
     {% endif %}

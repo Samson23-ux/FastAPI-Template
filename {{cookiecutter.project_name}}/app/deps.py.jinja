@@ -1,4 +1,6 @@
 {% set use_http = cookiecutter.make_http_requests == "yes" %}
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
 
 {% if use_http %}
 import httpx
@@ -139,20 +141,26 @@ async def get_current_user(
     user_email: str = payload.get("sub")
     user_type: str = payload.get("usertype")
 
+    {% if use_github or use_google %}
     if user_type == "email":
         user: User = await user_service.get_user_by_email(
             email=user_email, is_verified=True
         )
-    {% if cookiecutter.auth_with_github == "yes" %}
+    {% if use_github %}
     elif user_type == "github":
         user: User = await user_service.get_user_by_email(
             github_email=user_email, is_verified=True
         )
     {% endif %}
-    {% if cookiecutter.auth_with_google == "yes" %}
+    {% if use_google %}
     else:
         user: User = await user_service.get_user_by_email(
             google_email=user_email, is_verified=True
+        )
+    {% endif %}
+    {% else %}
+    user: User = await user_service.get_user_by_email(
+            email=user_email, is_verified=True
         )
     {% endif %}
     return user

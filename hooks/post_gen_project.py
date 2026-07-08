@@ -38,6 +38,11 @@ def main() -> None:
         if path.exists():
             path.unlink()
 
+    if "{{ cookiecutter.auth_with_github }}" == "no" or "{{ cookiecutter.auth_with_google }}" == "no":
+        path = project_dir / "app" / "util.py"
+        if path.exists():
+            path.unlink()
+
     subprocess.run(["uv", "sync"], cwd=project_dir)
     subprocess.run(["uvx", "black", "."], cwd=project_dir)
 

@@ -470,19 +470,24 @@ class AuthService:
 
     async def get_current_user(
         self, curr_user: User
-    ) -> EmailUserResponse | GoogleUserResponse:
+    ) -> EmailUserResponse{% if use_google == "yes" %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif %}:
+        {% if use_github or use_google %}
         if curr_user.type == "email":
             user_email: str = curr_user.email
             user = EmailUserResponse.model_validate(curr_user)
-        {% if use_github == "yes" %}
+        {% if use_github %}
         elif curr_user.type == "github":
             user_email: str = curr_user.github_email
             user = GithubUserResponse.model_validate(curr_user)
         {% endif %}
-        {% if use_google == "yes" %}
+        {% if use_google %}
         else:
             user_email: str = curr_user.google_email
             user = GoogleUserResponse.model_validate(curr_user)
+        {% endif %}
+        {% else %}
+        user_email: str = curr_user.email
+        user = EmailUserResponse.model_validate(curr_user)
         {% endif %}
 
         sentry_logger.info(
@@ -498,7 +503,11 @@ class AuthService:
         refresh_token: str,
         security: Security,
     ):
+        {% if use_github or use_google %}
         user_email: str = get_user_email(curr_user)
+        {% else %}
+        user_email: str = curr_user.email
+        {% endif %}
         _ = await self._revoke_refresh_token(refresh_token, security)
 
         curr_user.is_active = False
@@ -516,7 +525,11 @@ class AuthService:
         refresh_token: str,
         security: Security,
     ):
+        {% if use_github or use_google %}
         user_email: str = get_user_email(curr_user)
+        {% else %}
+        user_email: str = curr_user.email
+        {% endif %}
         await user_service.delete_user(curr_user)
         _ = await self._revoke_refresh_token(refresh_token, security)
 

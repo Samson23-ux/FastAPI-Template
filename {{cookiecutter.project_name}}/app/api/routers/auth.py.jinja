@@ -2,7 +2,9 @@
 {% set use_google = cookiecutter.auth_with_google == "yes" %}
 
 from uuid import uuid4
+{% if use_github or use_google %}
 from fastapi.responses import RedirectResponse
+{% endif %}
 from fastapi import APIRouter, Request, Response
 
 
