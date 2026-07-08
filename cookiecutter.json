@@ -3,9 +3,22 @@
     "project_slug": "{{ cookiecutter.project_name.lower().replace(' ', '-') }}",
     "author_name": "Samson",
     "python_version": "3.14",
+    "_jinja2_env_vars": {
+        "trim_blocks": true,
+        "lstrip_blocks": true
+    },
     "api_title": "My API",
     "api_description": "My API Description",
-    "auth_with_google": ["yes", "no"],
-    "auth_with_github": ["yes", "no"],
-    "make_http_requests": ["yes", "no"]
+    "auth_with_google": [
+        "yes",
+        "no"
+    ],
+    "auth_with_github": [
+        "yes",
+        "no"
+    ],
+    "make_http_requests": [
+        "yes",
+        "no"
+    ]
 }
