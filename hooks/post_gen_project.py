@@ -39,6 +39,7 @@ def main() -> None:
             path.unlink()
 
     subprocess.run(["uv", "sync"], cwd=project_dir)
+    subprocess.run(["uvx", "black", "."], cwd=project_dir)
 
 
 if __name__ == "__main__":

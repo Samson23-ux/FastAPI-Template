@@ -11,6 +11,7 @@ from httpx import Response, HTTPStatusError
 
 
 from app.api.models.otp import Otp
+from app.util import get_user_email
 from app.api.models.user import User
 from app.core.security import Security
 from app.core.config import get_settings
@@ -28,7 +29,7 @@ from app.worker.tasks.email import send_verification_email
 from app.api.schemas.user import (
     UserInDB,
     EmailUserResponse,
-    {% if use_github %}
+    {% if use_google %}
     GoogleUserResponse,
     {% endif %}
     {% if use_github %}
