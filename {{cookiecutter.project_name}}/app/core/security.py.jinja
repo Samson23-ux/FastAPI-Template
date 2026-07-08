@@ -16,8 +16,8 @@ from app.core.config import get_settings
 from app.api.schemas.auth import TokenData
 
 
-use_github = cookiecutter.auth_with_github == "yes"
-use_google = cookiecutter.auth_with_google == "yes"
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
 
 
 class Security:

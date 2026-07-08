@@ -2,8 +2,8 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-use_google = cookiecutter.auth_with_google == "yes"
-use_github = cookiecutter.auth_with_github == "yes"
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
 
 
 class Settings(BaseSettings):

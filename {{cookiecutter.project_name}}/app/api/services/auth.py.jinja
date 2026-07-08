@@ -41,8 +41,8 @@ from app.core.exceptions import (
 )
 
 
-use_google = cookiecutter.auth_with_google == "yes"
-use_github = cookiecutter.auth_with_github == "yes"
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
 
 
 class AuthService:

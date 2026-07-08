@@ -18,7 +18,7 @@ SECURITY = Security()
 SETTINGS = get_settings()
 
 
-oauth_supported = cookiecutter.auth_with_google == "yes" or cookiecutter.auth_with_github == "yes"
+{% set oauth_supported = cookiecutter.auth_with_google == "yes" or cookiecutter.auth_with_github == "yes" %}
 
 
 sentry_sdk.init(
