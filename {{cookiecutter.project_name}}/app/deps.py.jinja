@@ -139,7 +139,9 @@ async def get_current_user(
         raise AuthenticationError()
 
     user_email: str = payload.get("sub")
+    {% if use_github or use_google %}
     user_type: str = payload.get("usertype")
+    {% endif %}
 
     {% if use_github or use_google %}
     if user_type == "email":

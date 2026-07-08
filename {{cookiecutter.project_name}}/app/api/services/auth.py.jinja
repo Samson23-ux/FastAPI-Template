@@ -11,7 +11,9 @@ from httpx import Response, HTTPStatusError
 
 
 from app.api.models.otp import Otp
+{% if use_github or use_google %}
 from app.util import get_user_email
+{% endif %}
 from app.api.models.user import User
 from app.core.security import Security
 from app.core.config import get_settings
