@@ -38,7 +38,7 @@ def main() -> None:
         if path.exists():
             path.unlink()
 
-    if "{{ cookiecutter.auth_with_github }}" == "no" or "{{ cookiecutter.auth_with_google }}" == "no":
+    if "{{ cookiecutter.auth_with_github }}" == "no" and "{{ cookiecutter.auth_with_google }}" == "no":
         path = project_dir / "app" / "util.py"
         if path.exists():
             path.unlink()
