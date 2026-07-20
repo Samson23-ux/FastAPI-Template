@@ -75,7 +75,7 @@ async def sign_up_with_email(
         )
     )
 
-{% if use_google == "yes" %}
+{% if use_google %}
 @router.get(
     "/auth/google",
     status_code=302,

@@ -121,10 +121,10 @@ EmailServiceDep = Annotated[EmailService, Depends(get_email_service)]
 
 
 async def get_current_user(
+    security: SecurityDep,
     user_service: UserServiceDep,
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
 ) -> User:
-    security: Security = Security()
     if not credentials:
         sentry_logger.error("User not authenticated")
         raise AuthenticationError()

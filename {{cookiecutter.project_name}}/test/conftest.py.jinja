@@ -1,4 +1,6 @@
 {% set use_github = cookiecutter.auth_with_github == "yes" %}
+{% set use_http = cookiecutter.make_http_requests == "yes" %}
+
 {% if use_github %}
 import json
 import base64
@@ -28,16 +30,17 @@ from app.api.models.otp import Otp
 from app.api.models.base import Base
 from app.core.config import get_settings
 from app.api import models  # noqa: F401
-{% if cookiecutter.make_http_requests == "yes" %}
+from app.api.repo.otp import OtpRepository
+from app.database.session import get_session
+{% if use_http %}
 from app.api.services.request import Request
 {% endif %}
 from app.api.services.auth import AuthService
 from app.api.repo.redis import RedisRepository
 from app.deps import (
-    get_session,
     get_auth_service,
     get_redis_client,
-    {% if cookiecutter.make_http_requests == "yes" %}
+    {% if use_http %}
     get_request
     {% endif %}
 )
@@ -85,7 +88,7 @@ async def async_engine():
 
 
 @pytest_asyncio.fixture
-async def async_session(async_engine: AsyncEngine):
+async def session_maker(async_engine: AsyncEngine):
     async_connection: AsyncConnection = await async_engine.connect()
     async_transaction: AsyncTransaction = await async_connection.begin()
 
@@ -98,10 +101,8 @@ async def async_session(async_engine: AsyncEngine):
         join_transaction_mode="create_savepoint",
     )
 
-    async_session: AsyncSession = session()
-    yield async_session
+    yield session
 
-    await async_session.close()
     await async_transaction.rollback()
     await async_connection.close()
 
@@ -122,7 +123,7 @@ async def flush_redis(test_redis_client: Redis):
     yield
     await test_redis_client.flushdb()
 
-
+{% if use_http %}
 def get_request_mock():
     fake_github_token: dict = {"access_token": "fakeaccesstoken"}
     user_profile: dict = {
@@ -141,16 +142,25 @@ def get_request_mock():
     request.get.return_value = user_profile_response
 
     return request
+{% endif %}
 
 
 @pytest_asyncio.fixture
-async def async_client(async_session: AsyncSession, test_redis_client: Redis):
+async def async_client(
+    session_maker: async_sessionmaker[AsyncSession], test_redis_client: Redis
+):
     async def get_test_session():
-        return async_session
-    
-    request = get_request_mock()
+        session = session_maker()
+        yield session
+        await session.aclose()
 
+    {% if use_http %}
+    request = get_request_mock()
+    {% endif %}
+
+    {% if use_http %}
     app.dependency_overrides[get_request] = lambda: request
+    {% endif %}
     app.dependency_overrides[get_session] = get_test_session
     app.dependency_overrides[get_redis_client] = lambda: test_redis_client
 
@@ -172,7 +182,7 @@ async def create_user(async_client: AsyncClient):
         "password": "test_user_password",
     }
 
-    with patch(path, new_callable=AsyncMock) as email_patch:
+    with patch(path) as email_patch:
         res: Response = await async_client.post(
             "/auth/signup",
             json=sign_up_payload,
@@ -185,7 +195,7 @@ async def create_user(async_client: AsyncClient):
 
 
 def mock_auth_service(fake_otp: Otp, redis: Redis):
-    otp_repo = AsyncMock()
+    otp_repo = MagicMock(spec=OtpRepository)
     redis = RedisRepository(async_redis=redis)
 
     otp_repo.get_record = AsyncMock(return_value=fake_otp)

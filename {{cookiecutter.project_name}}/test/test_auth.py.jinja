@@ -242,7 +242,7 @@ class TestResendOtp:
             "email": "user@example.com",
         }
 
-        with patch(path, new_callable=AsyncMock) as email_patch:
+        with patch(path) as email_patch:
             res: httpx.Response = await async_client.post(
                 "/auth/verify/resend",
                 json=resend_otp_payload,
