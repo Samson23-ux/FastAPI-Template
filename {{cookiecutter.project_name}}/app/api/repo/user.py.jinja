@@ -1,9 +1,6 @@
 {% set use_google = cookiecutter.auth_with_google == "yes" %}
 
 from typing import Any
-{% if use_google %}
-from sqlalchemy import and_
-{% endif %}
 
 
 from app.api.models.user import User

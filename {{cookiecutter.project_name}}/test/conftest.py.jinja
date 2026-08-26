@@ -30,12 +30,12 @@ from app.api.models.otp import Otp
 from app.api.models.base import Base
 from app.core.config import get_settings
 from app.api import models  # noqa: F401
-from app.api.repo.otp import OtpRepository
 from app.database.session import get_session
 {% if use_http %}
 from app.api.services.request import Request
 {% endif %}
 from app.api.services.auth import AuthService
+from app.api.services.otp import OtpService
 from app.api.repo.redis import RedisRepository
 from app.deps import (
     get_auth_service,
@@ -195,11 +195,24 @@ async def create_user(async_client: AsyncClient):
 
 
 def mock_auth_service(fake_otp: Otp, redis: Redis):
-    otp_repo = MagicMock(spec=OtpRepository)
-    redis = RedisRepository(async_redis=redis)
+    redis_repo = RedisRepository(async_redis=redis)
+    auth_service = AuthService(redis_repo=redis_repo)
 
-    otp_repo.get_record = AsyncMock(return_value=fake_otp)
-    auth_service = AuthService(otp_repo=otp_repo, redis_repo=redis)
+    otp_service = MagicMock(spec=OtpService)
+    otp_service.get_otp = AsyncMock(return_value=fake_otp)
+    otp_service.update_otp = AsyncMock(return_value=fake_otp)
+
+    # verify_account still needs a real, uow-bound UserService to look up
+    # and update the actual test user, so run the real setup and only
+    # swap in the mocked otp_service afterwards - this bypasses the need
+    # for a real otp row to exist without faking the user side too.
+    real_uow_otp_user = auth_service._uow_otp_user
+
+    async def _uow_otp_user(uow):
+        await real_uow_otp_user(uow)
+        auth_service._otp_service = otp_service
+
+    auth_service._uow_otp_user = _uow_otp_user
 
     app.dependency_overrides[get_auth_service] = lambda: auth_service
 

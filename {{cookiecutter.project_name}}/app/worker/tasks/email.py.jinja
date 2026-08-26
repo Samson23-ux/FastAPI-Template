@@ -103,7 +103,7 @@ def send_verification_email(self, email_id: UUID, recipient_email: str, user_id:
                 + timedelta(minutes=SETTINGS.OTP_EXPIRE_TIME),
             )
 
-            otp_service.create_otp(otp_payload)
+            otp_service.create_otp(otp_payload, recipient_email)
     except (
         ResendError,
         psycopg2.OperationalError,
@@ -125,10 +125,5 @@ def send_verification_email(self, email_id: UUID, recipient_email: str, user_id:
             self._handle_failure(self.request.kwargs)
             raise Reject(exc, requeue=False)
     except Exception as exc:
-        """Update state and reject manaully to send to dlq for non-transient errors"""
         self._handle_failure(self.request.kwargs)
         raise Reject(exc, requeue=False)
-    finally:
-        otp_service._otp_repo.close()
-        redis_repo._sync_redis.close()
-        email_service._email_repo.close()

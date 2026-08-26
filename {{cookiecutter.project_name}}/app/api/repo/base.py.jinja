@@ -26,12 +26,29 @@ class BaseRepository(ABC, Generic[Entity, SqlalchemyModel]):
 
     model: type[SqlalchemyModel]
 
+    @property
+    def async_session(self):
+        return self._async_session
+
+    @async_session.setter
+    def async_session(self, session):
+        self._async_session = session
+
+    @property
+    def sync_session(self):
+        return self._sync_session
+
+    @sync_session.setter
+    def sync_session(self, session):
+        self._sync_session = session
+
     def add(
         self, entity: Optional[Entity] = None, model: Optional[SqlalchemyModel] = None
-    ):
+    ) -> SqlalchemyModel:
         if not model:
             model: SqlalchemyModel = self._entity_to_model(entity)
         self._async_session.add(model)
+        return model
 
     async def flush(self):
         await self._async_session.flush()
@@ -50,13 +67,12 @@ class BaseRepository(ABC, Generic[Entity, SqlalchemyModel]):
 
     async def delete(self, model: SqlalchemyModel):
         await self._async_session.delete(model)
-        await self._async_session.flush()
 
     async def get_records(
         self,
-        sort: str,
-        order: str,
-        cursor: str,
+        sort: str | None,
+        order: str | None,
+        cursor: str | None,
         limit: int,
         **filters,
     ) -> dict:
@@ -122,7 +138,7 @@ class BaseRepository(ABC, Generic[Entity, SqlalchemyModel]):
     ):
         filter_conditions: list[Any] = self._get_filters(**filters)
         await self._async_session.execute(
-            update(self.model).where(*filter_conditions).values(fields_to_update)
+            update(self.model).values(fields_to_update).where(*filter_conditions)
         )
 
     @abstractmethod
@@ -131,6 +147,10 @@ class BaseRepository(ABC, Generic[Entity, SqlalchemyModel]):
 
     @abstractmethod
     def _get_filters(self, **filters) -> list[Any]:
+        return []
+
+    @abstractmethod
+    def _get_sort_fields(self, sort: str) -> list[Any]:
         return []
 
     # sync db queries
@@ -148,10 +168,11 @@ class BaseRepository(ABC, Generic[Entity, SqlalchemyModel]):
 
     def sync_add(
         self, entity: Optional[Entity] = None, model: Optional[SqlalchemyModel] = None
-    ):
+    ) -> SqlalchemyModel:
         if not model:
             model: SqlalchemyModel = self._entity_to_model(entity)
         self._sync_session.add(model)
+        return model
 
     def sync_flush(self):
         self._sync_session.flush()
@@ -167,7 +188,6 @@ class BaseRepository(ABC, Generic[Entity, SqlalchemyModel]):
 
     def sync_delete(self, model: SqlalchemyModel):
         self._sync_session.delete(model)
-        self._sync_session.flush()
 
     def close(self):
         self._sync_session.close()

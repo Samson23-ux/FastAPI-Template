@@ -19,13 +19,13 @@ class EmailService:
         try:
             self._email_repo.add(entity=email_payload)
             await self._email_repo.commit()
-        except Exception as e:
+        except Exception as exc:
             await self._email_repo.rollback()
-            sentry_sdk.capture_exception(e)
+            sentry_sdk.capture_exception(exc)
             sentry_logger.error(
                 "Error occured while creating email record",
             )
-            raise ServerError() from e
+            raise ServerError() from exc
 
     def get_processed_email(self, email_id: UUID) -> Email | None:
         email: Email | None = self._email_repo.get_sync_record(id=email_id)
@@ -35,13 +35,13 @@ class EmailService:
         try:
             self._email_repo.sync_add(model=email)
             self._email_repo.sync_commit()
-        except Exception as e:
+        except Exception as exc:
             self._email_repo.sync_rollback()
-            sentry_sdk.capture_exception(e)
+            sentry_sdk.capture_exception(exc)
             sentry_logger.error(
                 "Error occured while updating email record",
             )
-            raise ServerError() from e
+            raise ServerError() from exc
 
     @property
     def api_key(self):

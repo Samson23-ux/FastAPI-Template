@@ -70,7 +70,7 @@ class Security:
             if cursor_payload["order"] != curr_order.lower():
                 return
             return cursor_payload
-        except json.JSONDecodeError, UnicodeDecodeError, binascii_error:
+        except (json.JSONDecodeError, UnicodeDecodeError, binascii_error):
             return
 
     async def hash_password(self, password: str) -> str:

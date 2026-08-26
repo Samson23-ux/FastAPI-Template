@@ -65,9 +65,9 @@ class User(Base):
         PrimaryKeyConstraint("id", name="users_pk"),
         Index("idx_users_email", email),
         {% if use_google %}
-        Index("idx_users_google_id", google_id),
+        Index("idx_users_google_email", google_email),
         {% endif %}
         {% if use_github %}
-        Index("idx_users_github_id", github_id)
+        Index("idx_users_github_email", github_email)
         {% endif %}
     )

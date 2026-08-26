@@ -1,5 +1,6 @@
 from uuid import UUID
 from typing import Optional
+from datetime import datetime
 from pydantic import BaseModel, EmailStr, ConfigDict
 
 
@@ -50,13 +51,16 @@ class UserInDB(EmailUser):
 {% if use_google %}
 class GoogleUserResponse(GoogleUser):
     id: UUID
+    created_at: datetime
 {% endif %}
 
 {% if use_github %}
 class GithubUserResponse(GithubUser):
     id: UUID
+    created_at: datetime
 {% endif %}
 
 
 class EmailUserResponse(EmailUser):
     id: UUID
+    created_at: datetime

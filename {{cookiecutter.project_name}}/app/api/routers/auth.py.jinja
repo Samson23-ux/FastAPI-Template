@@ -8,14 +8,13 @@ from fastapi.responses import RedirectResponse
 from fastapi import APIRouter, Request, Response
 
 
-from app.limiter import limiter
 from app.core.config import get_settings
 {% if use_github %}
 from app.core.exceptions import AuthorizationError
 {% endif %}
 from app.api.schemas.response import SuccessResponse
 from app.api.schemas.user import (
-    {% if use_google == "yes" %}
+    {% if use_google %}
     GoogleUserResponse,
     {% endif %}
     EmailUserResponse,
@@ -33,6 +32,7 @@ from app.deps import (
     CurrentActiveUser,
     UnitOfWorkRepo,
     EmailServiceDep,
+    OtpServiceDep
 )
 from app.api.schemas.auth import (
     SignUpResponse,
@@ -56,7 +56,6 @@ router = APIRouter()
         "A verification code is sent to the user's email on completion"
     ),
 )
-@limiter.limit("3/5minute")
 async def sign_up_with_email(
     request: Request,
     security: SecurityDep,
@@ -82,7 +81,6 @@ async def sign_up_with_email(
     response_class=RedirectResponse,
     description="Sign in with Google account",
 )
-@limiter.limit("3/5minute")
 async def sign_in_with_google(request: Request, security: SecurityDep):
     redirect_uri = request.url_for("google_callback")
     await security.register_oauth()
@@ -95,7 +93,6 @@ async def sign_in_with_google(request: Request, security: SecurityDep):
     response_model=SuccessResponse[Token],
     description="Google redirect uri",
 )
-@limiter.limit("3/5minute")
 async def google_callback(
     request: Request,
     response: Response,
@@ -129,7 +126,6 @@ async def google_callback(
     response_class=RedirectResponse,
     description="Sign up with github",
 )
-@limiter.limit("10/minute")
 async def sign_in_with_github(request: Request, security: SecurityDep):
     state: str = str(uuid4())
     code_verifier: str = await security.get_code_verifier()
@@ -157,7 +153,6 @@ async def sign_in_with_github(request: Request, security: SecurityDep):
     response_model=SuccessResponse[Token],
     description="Github callback url",
 )
-@limiter.limit("10/minute")
 async def github_callback(
     request: Request,
     response: Response,
@@ -205,7 +200,6 @@ async def github_callback(
     response_model=SuccessResponse[EmailUserResponse],
     description="Verify account by submitting the received otp code",
 )
-@limiter.limit("3/5minute")
 async def verify_account(
     request: Request,
     uow: UnitOfWorkRepo,
@@ -222,15 +216,15 @@ async def verify_account(
     description="Resend verification code",
     response_model=SuccessResponse[OtpResendResponse],
 )
-@limiter.limit("3/5minute")
 async def resend_otp(
     request: Request,
     otp_resend: ResendOtp,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
     email_service: EmailServiceDep,
+    otp_service: OtpServiceDep,
 ):
-    await auth_service.resend_otp(otp_resend, user_service, email_service)
+    await auth_service.resend_otp(otp_resend, user_service, email_service, otp_service)
     return SuccessResponse(
         message="OTP sent successfully. Check your email for instructions"
     )
@@ -242,7 +236,6 @@ async def resend_otp(
     description="Login with email and password",
     response_model=SuccessResponse[Token],
 )
-@limiter.limit("3/5minute")
 async def login(
     request: Request,
     response: Response,
@@ -275,7 +268,6 @@ async def login(
     response_model=SuccessResponse[Token],
     description="Create new access token for user with a valid refresh token",
 )
-@limiter.limit("3/5minute")
 async def create_new_token(
     request: Request,
     response: Response,
@@ -306,16 +298,15 @@ async def create_new_token(
     status_code=200,
     description="Get current active user",
     response_model=SuccessResponse[
-        EmailUserResponse{% if use_google == "yes" %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif %}
+        EmailUserResponse{% if use_google %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif %}
     ],
 )
-@limiter.limit("3/5minute")
 async def get_current_user(
     request: Request,
     curr_user: CurrentActiveUser,
     auth_service: AuthServiceDep,
 ):
-    user: EmailUserResponse{% if use_google == "yes" %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif %} = (
+    user: EmailUserResponse{% if use_google %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif %} = (
         await auth_service.get_current_user(curr_user)
     )
     return SuccessResponse(message="User retrieved successfully", data=user)
@@ -327,7 +318,6 @@ async def get_current_user(
     response_model=SuccessResponse[LogoutResponse],
     description="Log out account",
 )
-@limiter.limit("3/5minute")
 async def log_out(
     request: Request,
     security: SecurityDep,
@@ -341,7 +331,6 @@ async def log_out(
 
 
 @router.delete("/auth", status_code=204, description="Delete account permanently")
-@limiter.limit("3/5minute")
 async def delete_account(
     request: Request,
     security: SecurityDep,

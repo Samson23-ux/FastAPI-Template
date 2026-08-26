@@ -1,0 +1,45 @@
+from app.api.models.user import User
+
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
+
+
+def _serialize_user(user: User) -> dict:
+    return {
+        "id": str(user.id),
+        "type": user.type.value,
+        "email": user.email or "",
+        "hashed_password": user.hashed_password or "",
+        {% if use_google %}
+        "google_id": user.google_id or "",
+        "google_email": user.google_email or "",
+        {% endif %}
+        {% if use_github %}
+        "github_id": user.github_id or "",
+        "github_email": user.github_email or "",
+        {% endif %}
+        "is_active": "1" if user.is_active else "0",
+        "is_verified": "1" if user.is_verified else "0",
+        "created_at": user.created_at
+    }
+
+
+def _deserialize_cached_user(cached: dict) -> User:
+    return User(
+        id=cached["id"],
+        type=cached["type"],
+        email=cached["email"] or None,
+        hashed_password=cached["hashed_password"] or None,
+        {% if use_google %}
+        google_id=cached["google_id"] or None,
+        google_email=cached["google_email"] or None,
+        {% endif %}
+        {% if use_github %}
+        github_id=cached["github_id"] or None,
+        github_email=cached["github_email"] or None,
+        {% endif %}
+        is_active=bool(cached["is_active"]),
+        is_verified=bool(cached["is_verified"]),
+        created_at=cached["created_at"]
+    )
+    

@@ -18,13 +18,14 @@ sentry_sdk.init(
 )
 
 
+tasks = ["app.worker.tasks.email"]
+
 celery_app = Celery(
     main="celery_app",
     broker=SETTINGS.BROKER_URL,
     backend=SETTINGS.REDIS_URL,
+    include=tasks
 )
 
 
 celery_app.config_from_object("app.worker.celeryconfig")
-
-celery_app.autodiscover_tasks(["app.worker.tasks.email"])

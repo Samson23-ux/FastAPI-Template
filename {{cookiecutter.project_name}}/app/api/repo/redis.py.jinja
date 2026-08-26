@@ -7,13 +7,13 @@ class RedisRepository:
         self._sync_redis = sync_redis
         self._async_redis = async_redis
 
-    async def add_refresh_token(self, key: str, value: dict):
+    async def create_hset(self, key: str, value: dict):
         await self._async_redis.hset(key, mapping=value)
 
-    async def get_refresh_token(self, key: str) -> dict:
+    async def get_hset(self, key: str) -> dict:
         return await self._async_redis.hgetall(key)
 
-    async def delete_refresh_token(self, key: str):
+    async def delete_key(self, key: str):
         await self._async_redis.delete(key)
 
     def get_processed_email(self, key: str) -> str | None:

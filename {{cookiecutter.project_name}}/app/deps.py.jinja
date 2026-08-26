@@ -16,7 +16,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.api.models.user import User
 from app.core.security import Security
 from app.core.config import get_settings
+from app.limiter import _limiter_handler
+from app.core.config import get_settings
 from app.api.repo.otp import OtpRepository
+from app.api.services.otp import OtpService
 from app.database.session import get_session
 from app.api.repo.user import UserRepository
 from app.api.services.auth import AuthService
@@ -29,6 +32,9 @@ from app.core.exceptions import AuthenticationError
 {% if use_http %}
 from app.api.services.request import Request as HttpRequest
 {% endif %}
+
+
+SETTINGS = get_settings()
 
 # Auth bearer
 bearer = HTTPBearer(auto_error=False)
@@ -100,18 +106,25 @@ UnitOfWorkRepo = Annotated[UnitOfWorkRepository, Depends(get_unit_of_work)]
 #  -------------------- Service dependency ---------------------------- #
 
 
-async def get_user_service(user_repo: UserRepo) -> UserService:
-    return UserService(user_repo=user_repo)
+async def get_user_service(
+    user_repo: UserRepo, redis_repo: RedisRepo
+) -> UserService:
+    return UserService(user_repo=user_repo, redis_repo=redis_repo)
 
 
 async def get_email_service(email_repo: EmailRepo) -> EmailService:
     return EmailService(email_repo=email_repo)
 
 
-async def get_auth_service(otp_repo: OtpRepo, redis_repo: RedisRepo) -> AuthService:
-    return AuthService(otp_repo=otp_repo, redis_repo=redis_repo)
+async def get_auth_service(redis_repo: RedisRepo) -> AuthService:
+    return AuthService(redis_repo=redis_repo)
 
 
+async def get_otp_service(otp_repo: OtpRepo) -> OtpService:
+    return OtpService(otp_repo=otp_repo)
+
+
+OtpServiceDep = Annotated[OtpService, Depends(get_otp_service)]
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 EmailServiceDep = Annotated[EmailService, Depends(get_email_service)]
@@ -139,32 +152,33 @@ async def get_current_user(
         raise AuthenticationError()
 
     user_email: str = payload.get("sub")
-    {% if use_github or use_google %}
-    user_type: str = payload.get("usertype")
-    {% endif %}
 
     {% if use_github or use_google %}
+    filters: dict = {}
+    user_type: str = payload.get("usertype")
+
     if user_type == "email":
-        user: User = await user_service.get_user_by_email(
-            email=user_email, is_verified=True
-        )
+        filters["email"] = user_email
     {% if use_github %}
-    elif user_type == "github":
-        user: User = await user_service.get_user_by_email(
-            github_email=user_email, is_verified=True
-        )
+    elif user_type == "github_email":
+        filters["github_email"] = user_email
     {% endif %}
     {% if use_google %}
     else:
-        user: User = await user_service.get_user_by_email(
-            google_email=user_email, is_verified=True
-        )
+        filters["google_email"] = user_email
     {% endif %}
     {% else %}
-    user: User = await user_service.get_user_by_email(
-            email=user_email, is_verified=True
-        )
+    filters: dict = {"email": user_email}
     {% endif %}
+
+    user: User = await user_service.get_cached_user(**filters)
+
+    if not user:
+        filters["is_verified"] = True
+        user: User = await user_service.get_user_by_email(**filters)
+
+        await user_service.cache_user(user)
+
     return user
 
 
@@ -178,3 +192,9 @@ async def get_current_active_user(curr_user: CurrentUser):
 
 
 CurrentActiveUser = Annotated[User, Depends(get_current_active_user)]
+
+
+# ------------------------ Limiter -------------------------------- #
+auth_limiter = Depends(
+    _limiter_handler(key=SETTINGS.AUTH_LIMIT_KEY, limit=10, unit="minutes", multiplier=15)
+)
