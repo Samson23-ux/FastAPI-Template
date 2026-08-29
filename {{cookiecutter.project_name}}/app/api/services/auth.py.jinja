@@ -67,16 +67,14 @@ class AuthService:
 
     SETTINGS = get_settings()
 
-    async def _setup_uow(self, uow: UnitOfWorkRepository, *args):
+    async def _setup_uow(self, uow: UnitOfWorkRepository):
         self._uow = uow
-        for arg in args:
-            arg.async_session = uow._session
 
     async def _uow_otp_user(self, uow: UnitOfWorkRepository):
-        otp_repo = OtpRepository()
-        user_repo = UserRepository()
+        await self._setup_uow(uow)
 
-        await self._setup_uow(uow, otp_repo, user_repo)
+        otp_repo = self._uow.repo(OtpRepository)
+        user_repo = self._uow.repo(UserRepository)
 
         self._otp_service = OtpService(otp_repo=otp_repo)
         self._user_service = UserService(user_repo=user_repo, redis_repo=self._redis_repo)
