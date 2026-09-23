@@ -1,5 +1,5 @@
 [project]
-name = "{{ cookiecutter.project_name }}"
+name = "{{ cookiecutter.project_slug }}"
 version = "0.1.0"
 description = "{{ cookiecutter.api_description }}"
 readme = "README.md"
@@ -28,3 +28,7 @@ dependencies = [
     "sentry-sdk",
     "sqlalchemy",
 ]
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope= "session"
+asyncio_default_test_loop_scope= "session"

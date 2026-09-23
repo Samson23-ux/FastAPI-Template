@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 from app.api.models.user import User
 
 {% set use_google = cookiecutter.auth_with_google == "yes" %}
@@ -20,7 +23,7 @@ def _serialize_user(user: User) -> dict:
         {% endif %}
         "is_active": "1" if user.is_active else "0",
         "is_verified": "1" if user.is_verified else "0",
-        "created_at": user.created_at
+        "created_at": user.created_at.isoformat()
     }
 
 
@@ -40,6 +43,6 @@ def _deserialize_cached_user(cached: dict) -> User:
         {% endif %}
         is_active=bool(cached["is_active"]),
         is_verified=bool(cached["is_verified"]),
-        created_at=cached["created_at"]
+        created_at=datetime.fromisoformat(cached["created_at"])
     )
     

@@ -17,7 +17,6 @@ from app.api.models.user import User
 from app.core.security import Security
 from app.core.config import get_settings
 from app.limiter import _limiter_handler
-from app.core.config import get_settings
 from app.api.repo.otp import OtpRepository
 from app.api.services.otp import OtpService
 from app.database.session import get_session
@@ -93,7 +92,7 @@ async def get_email_repo(session: DBSession) -> EmailRepository:
 
 
 async def get_unit_of_work(session: DBSession) -> UnitOfWorkRepository:
-    return UnitOfWorkRepository(session=session)
+    return UnitOfWorkRepository(async_session=session)
 
 
 OtpRepo = Annotated[OtpRepository, Depends(get_otp_repo)]
@@ -132,12 +131,11 @@ EmailServiceDep = Annotated[EmailService, Depends(get_email_service)]
 
 # ------------------------ Auth dependency ---------------------------- #
 
-
-async def get_current_user(
+async def _decode_credentials(
     security: SecurityDep,
-    user_service: UserServiceDep,
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer)],
-) -> User:
+) -> tuple[str, str]:
+    """Returns (user_email_or_google_email, user_type) from a validated JWT."""
     if not credentials:
         sentry_logger.error("User not authenticated")
         raise AuthenticationError()
@@ -151,11 +149,21 @@ async def get_current_user(
         sentry_logger.error("User not authenticated")
         raise AuthenticationError()
 
-    user_email: str = payload.get("sub")
+    return payload.get("sub"), payload.get("usertype")
+
+
+async def get_current_user(
+    user_service: UserServiceDep,
+    identity: Annotated[tuple[str, str], Depends(_decode_credentials)],
+) -> User:
+    {% if use_github or use_google %}
+    user_email, user_type = identity
+    {% else %}
+    user_email, _ = identity
+    {% endif %}
 
     {% if use_github or use_google %}
     filters: dict = {}
-    user_type: str = payload.get("usertype")
 
     if user_type == "email":
         filters["email"] = user_email
@@ -171,14 +179,7 @@ async def get_current_user(
     filters: dict = {"email": user_email}
     {% endif %}
 
-    user: User = await user_service.get_cached_user(**filters)
-
-    if not user:
-        filters["is_verified"] = True
-        user: User = await user_service.get_user_by_email(**filters)
-
-        await user_service.cache_user(user)
-
+    user: User = await user_service.get_user_by_email(**filters)
     return user
 
 
@@ -193,8 +194,61 @@ async def get_current_active_user(curr_user: CurrentUser):
 
 CurrentActiveUser = Annotated[User, Depends(get_current_active_user)]
 
+async def get_cached_current_user(
+    user_service: UserServiceDep,
+    identity: Annotated[tuple[str, str], Depends(_decode_credentials)],
+):
+    {% if use_github or use_google %}
+    user_email, user_type = identity
+    filters: dict = {"user_type": user_type}
+    {% else %}
+    user_email, _ = identity
+    filters: dict = {"email": user_email}
+    {% endif %}
+
+    {% if use_github or use_google %}
+    if user_type == "email":
+        filters["email"] = user_email
+    {% if use_github %}
+    elif user_type == "github_email":
+        filters["github_email"] = user_email
+    {% endif %}
+    {% if use_google %}
+    else:
+        filters["google_email"] = user_email
+    {% endif %}
+    {% endif %}
+
+    user: User = await user_service.get_cached_user(**filters)
+
+    if not user:
+        filters["is_verified"] = True
+        user: User = await user_service.get_user_by_email(**filters)
+
+        await user_service.cache_user(user)
+    return user
+
+
+CachedCurrentUser = Annotated[User, Depends(get_cached_current_user)]
+
+
+async def get_current_active_cached_user(cached_user: CachedCurrentUser):
+    if cached_user.is_active is False:
+        raise AuthenticationError()
+    return cached_user
+
+
+CurrentActiveCachedUser = Annotated[User, Depends(get_current_active_cached_user)]
+
 
 # ------------------------ Limiter -------------------------------- #
-auth_limiter = Depends(
-    _limiter_handler(key=SETTINGS.AUTH_LIMIT_KEY, limit=10, unit="minutes", multiplier=15)
+write_limiter = Depends(
+    _limiter_handler(
+        key=SETTINGS.WRITE_LIMIT_KEY, limit=10, unit="minutes", multiplier=15
+    )
+)
+read_limiter = Depends(
+    _limiter_handler(
+        key=SETTINGS.READ_LIMIT_KEY, limit=10, unit="minutes", multiplier=1
+    )
 )

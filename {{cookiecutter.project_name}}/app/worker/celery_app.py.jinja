@@ -24,7 +24,7 @@ celery_app = Celery(
     main="celery_app",
     broker=SETTINGS.BROKER_URL,
     backend=SETTINGS.REDIS_URL,
-    include=tasks
+    include=tasks,
 )
 
 

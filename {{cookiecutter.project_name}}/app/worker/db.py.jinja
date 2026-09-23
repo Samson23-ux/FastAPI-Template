@@ -10,7 +10,6 @@ from redis.exceptions import TimeoutError, ConnectionError
 from app.core.config import get_settings
 from app.database.session import sync_session
 
-
 SETTINGS = get_settings()
 
 redis_pool = ConnectionPool.from_url(

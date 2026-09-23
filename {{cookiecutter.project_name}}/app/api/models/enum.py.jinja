@@ -1,0 +1,26 @@
+from enum import Enum
+
+
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
+
+
+class UserType(str, Enum):
+    EMAIL = "email"
+    {% if use_github %}
+    GITHUB = "github"
+    {% endif %}
+    {% if use_google %}
+    GOOGLE = "google"
+    {% endif %}
+
+
+class OtpStatus(str, Enum):
+    VALID = "valid"
+    USED = "used"
+
+
+class EmailStatus(str, Enum):
+    PENDING = "pending"
+    DELIVERED = "delivered"
+    FAILED = "failed"
