@@ -12,7 +12,7 @@ class AuthBase(BaseModel):
 
 
 class TokenData(AuthBase):
-    email: str
+    email: EmailStr
     user_type: UserType
 
 
@@ -22,12 +22,12 @@ class Token(AuthBase):
 
 
 class EmailVerify(AuthBase):
-    email: str
+    email: EmailStr
     otp_code: str
 
 
 class ResendOtp(AuthBase):
-    email: str
+    email: EmailStr
 
 
 class EmailLogin(AuthBase):
