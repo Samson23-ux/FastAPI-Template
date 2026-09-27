@@ -1,26 +1,25 @@
 import time
-from uuid import uuid4
-from typing import Any
 from redis.asyncio import Redis
 from fastapi.requests import Request
 from fastapi.responses import Response
 from pyrate_limiter.limiter import Limiter
 from fastapi_limiter.depends import RateLimiter
 from fastapi_limiter.callback import default_callback
-from fastapi_limiter.identifier import default_identifier
 from pyrate_limiter.abstracts.bucket import BucketFactory
 from pyrate_limiter.buckets.redis_bucket import RedisBucket
 from pyrate_limiter.abstracts.rate import Duration, Rate, RateItem
 
 
-async def test_aware_identifier(request: Request) -> str | Any:
+async def client_identifier(request: Request) -> str:
+    """Key by the connecting client's IP + path.
+
+    fastapi_limiter's default_identifier trusts X-Forwarded-For, which any
+    client can set to get a fresh bucket per request. request.client is the
+    socket peer; behind a reverse proxy, run uvicorn with --proxy-headers and
+    --forwarded-allow-ips so it is resolved from trusted proxies only.
     """
-    Bypass limiter in test environment.
-    Default_identifier already keys by client IP + path.
-    """
-    if request.headers.get("env") == "test":
-        return f"test:{uuid4()}"
-    return await default_identifier(request)
+    ip = request.client.host if request.client else "127.0.0.1"
+    return f"{ip}:{request.scope['path']}"
 
 
 DURATION_MAPPING = {
@@ -130,7 +129,7 @@ async def get_limiter(request: Request, config: tuple) -> RateLimiter:
 
         rate_limiter = SafeRateLimiter(
             limiter=limiter,
-            identifier=test_aware_identifier,
+            identifier=client_identifier,
             callback=default_callback,
         )
 
