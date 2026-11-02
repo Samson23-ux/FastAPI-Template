@@ -1,9 +1,8 @@
 from typing import Any
 
-
 from app.api.models.email import Email
-from app.api.schemas.email import EmailBase
 from app.api.repo.base import BaseRepository
+from app.api.schemas.email import EmailBase
 
 
 class EmailRepository(BaseRepository[EmailBase, Email]):
@@ -21,3 +20,6 @@ class EmailRepository(BaseRepository[EmailBase, Email]):
 
     def _get_sort_fields(self, sort):
         return super()._get_sort_fields(sort)
+
+    def _parse_cursor_value(self, val):
+        return super()._parse_cursor_value(val)
