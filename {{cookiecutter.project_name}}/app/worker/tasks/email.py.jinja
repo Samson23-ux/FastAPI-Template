@@ -1,15 +1,16 @@
-import psycopg2
+from datetime import UTC, datetime
 from uuid import UUID
+
+import psycopg2
 from celery.exceptions import Reject
-from datetime import datetime, timezone
 from resend.exceptions import ResendError
 
-
-from app.worker import celery_app
 from app.api.models.email import Email
+from app.api.models.enum import EmailStatus
 from app.core.config import get_settings
-from app.worker import BaseTaskWithFailure
 from app.core.exceptions import MaxRetriesError
+from app.worker import BaseTaskWithFailure, celery_app
+lazy from app.worker import get_email_service
 
 SETTINGS = get_settings()
 SENDER_EMAIL = SETTINGS.API_EMAIL
@@ -24,29 +25,19 @@ def send_email(
     email_id: UUID,
     recipient_email: str,
 ):
-    from app.worker import get_redis_repo, get_email_service
-
     try:
-        redis_repo = get_redis_repo()
         email_service = get_email_service()
 
-        key: str = f"idempotency:{email_id}"
-        already_processed: str | None = redis_repo.get_idempotency_key(key)
+        email_service.api_key = RESEND_API_KEY
+        email_service.send(
+            SENDER_EMAIL, recipient_email, email_subject, email_message, self.request.id
+        )
 
-        if not already_processed:
-            email_service.api_key = RESEND_API_KEY
-            email_service.send(
-                SENDER_EMAIL,
-                recipient_email,
-                email_subject,
-                email_message,
-            )
+        email: Email | None = email_service.get_processed_email(email_id)
 
-            redis_repo.mark_idempotency_key(key, "1", SETTINGS.IDEMPOTENCY_KEY_TTL)
-
-            email: Email = email_service.get_processed_email(email_id)
-            email.status = "delivered"
-            email.delivered_at = datetime.now(timezone.utc)
+        if email:
+            email.status = EmailStatus.DELIVERED
+            email.delivered_at = datetime.now(UTC)
             email_service.update_processed_email(email)
     except (
         ResendError,
@@ -56,18 +47,22 @@ def send_email(
     ) as exc:
         """retry for transient errors"""
         try:
-            if isinstance(exc, ResendError):
-                if hasattr(exc, "code") and exc.code >= 500:
-                    raise self.retry(
-                        exc=MaxRetriesError(str(exc)),
-                        countdown=self._backoff_countdown(),
-                    )
-            raise self.retry(
-                exc=MaxRetriesError(str(exc)), countdown=self._backoff_countdown()
-            )
+            if not isinstance(exc, ResendError):
+                raise self.retry(
+                    exc=MaxRetriesError(str(exc)), countdown=self._backoff_countdown()
+                )
+
+            if hasattr(exc, "code") and int(exc.code) >= 500:
+                raise self.retry(
+                    exc=MaxRetriesError(str(exc)),
+                    countdown=self._backoff_countdown(),
+                )
+            else:
+                self._handle_failure(self.request.kwargs)
+                raise Reject(exc, requeue=False)
         except MaxRetriesError as exc:
             self._handle_failure(self.request.kwargs)
             raise Reject(exc, requeue=False)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         self._handle_failure(self.request.kwargs)
         raise Reject(exc, requeue=False)
