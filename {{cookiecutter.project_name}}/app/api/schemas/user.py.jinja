@@ -1,17 +1,15 @@
-from uuid import UUID
-from typing import Optional
+{% set use_google = cookiecutter.auth_with_google == "yes" %}
+{% set use_github = cookiecutter.auth_with_github == "yes" %}
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, ConfigDict
+from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 from app.api.models.user import UserType
 
 
-{% set use_google = cookiecutter.auth_with_google == "yes" %}
-{% set use_github = cookiecutter.auth_with_github == "yes" %}
-
-
 class UserBase(BaseModel):
+    id: UUID
     type: UserType
     is_active: bool = False
     is_verified: bool = False
@@ -19,48 +17,49 @@ class UserBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 {% if use_google %}
-class GoogleUser(UserBase):
-    google_id: Optional[str] = None
-    google_email: Optional[EmailStr] = None
-{% endif %}
 
+class GoogleUser(UserBase):
+    google_id: str | None = None
+    google_email: EmailStr | None = None
+{% endif %}
 {% if use_github %}
+
 class GithubUser(UserBase):
-    github_id: Optional[str] = None
-    github_email: Optional[EmailStr] = None
+    github_id: str | None = None
+    github_email: EmailStr | None = None
 {% endif %}
 
 
 class EmailUser(UserBase):
-    email: Optional[EmailStr] = None
+    email: EmailStr | None = None
+
 
 {% if use_google and use_github %}
 class UserInDB(GoogleUser, GithubUser, EmailUser):
-    hashed_password: Optional[str] = None
-{% elif use_google and not use_github %}
+{% elif use_google %}
 class UserInDB(GoogleUser, EmailUser):
-    hashed_password: Optional[str] = None
-{% elif not use_google and use_github %}
+{% elif use_github %}
 class UserInDB(GithubUser, EmailUser):
-    hashed_password: Optional[str] = None
 {% else %}
 class UserInDB(EmailUser):
-    hashed_password: Optional[str] = None
 {% endif %}
+    hashed_password: str | None = None
+
+
+class UserResponse(BaseModel):
+    created_at: datetime
 
 {% if use_google %}
-class GoogleUserResponse(GoogleUser):
-    id: UUID
-    created_at: datetime
-{% endif %}
 
+class GoogleUserResponse(GoogleUser, UserResponse):
+    pass
+{% endif %}
 {% if use_github %}
-class GithubUserResponse(GithubUser):
-    id: UUID
-    created_at: datetime
+
+class GithubUserResponse(GithubUser, UserResponse):
+    pass
 {% endif %}
 
 
-class EmailUserResponse(EmailUser):
-    id: UUID
-    created_at: datetime
+class EmailUserResponse(EmailUser, UserResponse):
+    pass

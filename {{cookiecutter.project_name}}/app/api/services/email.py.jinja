@@ -1,13 +1,13 @@
+from uuid import UUID
+
 import resend
 import sentry_sdk
-from uuid import UUID
 import sentry_sdk.logger as sentry_logger
 
-
 from app.api.models.email import Email
+from app.api.repo.email import EmailRepository
 from app.api.schemas.email import EmailInDB
 from app.core.exceptions import ServerError
-from app.api.repo.email import EmailRepository
 
 
 class EmailService:
@@ -18,7 +18,7 @@ class EmailService:
     async def create_email(self, email_payload: EmailInDB, commit: bool = False):
         try:
             self._email_repo.add(entity=email_payload)
-            
+
             if commit:
                 await self._email_repo.commit()
         except Exception as exc:
@@ -27,7 +27,7 @@ class EmailService:
 
             sentry_sdk.capture_exception(exc)
             sentry_logger.error(
-                "Error occured while creating email record",
+                "Error occurred while creating email record",
             )
             raise ServerError() from exc
 
@@ -43,7 +43,7 @@ class EmailService:
             self._email_repo.sync_rollback()
             sentry_sdk.capture_exception(exc)
             sentry_logger.error(
-                "Error occured while updating email record",
+                "Error occurred while updating email record",
             )
             raise ServerError() from exc
 
@@ -56,12 +56,15 @@ class EmailService:
         self._api_key = api_key
         resend.api_key = self._api_key
 
-    def send(self, sender: str, recipient: str, subject: str, body: str):
+    def send(
+        self, sender: str, recipient: str, subject: str, body: str, idempotency_key: str
+    ):
         resend.Emails.send(
             {
                 "from": sender,
                 "to": recipient,
                 "subject": subject,
                 "html": body,
-            }
+            },
+            options={"idempotency_key": idempotency_key},
         )

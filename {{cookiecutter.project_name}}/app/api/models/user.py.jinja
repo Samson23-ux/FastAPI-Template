@@ -1,17 +1,17 @@
 import uuid
-from datetime import datetime, timezone
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import (
-    String,
-    Boolean,
-    text,
-    UUID,
-    DateTime,
-    PrimaryKeyConstraint,
-    Index,
-    Enum,
-)
+from datetime import UTC, datetime
 
+from sqlalchemy import (
+    UUID,
+    Boolean,
+    DateTime,
+    Enum,
+    Index,
+    PrimaryKeyConstraint,
+    String,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.api.models.base import Base
 from app.api.models.enum import UserType
@@ -48,7 +48,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
     __table_args__ = (

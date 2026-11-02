@@ -1,13 +1,14 @@
 import time
-from redis.asyncio import Redis
+
 from fastapi.requests import Request
 from fastapi.responses import Response
-from pyrate_limiter.limiter import Limiter
-from fastapi_limiter.depends import RateLimiter
 from fastapi_limiter.callback import default_callback
+from fastapi_limiter.depends import RateLimiter
 from pyrate_limiter.abstracts.bucket import BucketFactory
-from pyrate_limiter.buckets.redis_bucket import RedisBucket
 from pyrate_limiter.abstracts.rate import Duration, Rate, RateItem
+from pyrate_limiter.buckets.redis_bucket import RedisBucket
+from pyrate_limiter.limiter import Limiter
+from redis.asyncio import Redis
 
 
 async def client_identifier(request: Request) -> str:

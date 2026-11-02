@@ -1,6 +1,7 @@
-from typing import Type, TypeVar
-from sqlalchemy.orm import Session
+from typing import TypeVar
+
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 TRepo = TypeVar("TRepo")
 
@@ -12,7 +13,11 @@ rebinding each repo to the same session.
 
 
 class UnitOfWorkRepository:
-    def __init__(self, sync_session: Session = None, async_session: AsyncSession = None):
+    def __init__(
+        self,
+        sync_session: Session | None = None,
+        async_session: AsyncSession | None = None,
+    ):
         self._sync_session = sync_session
         self._async_session = async_session
 
@@ -20,13 +25,31 @@ class UnitOfWorkRepository:
 
     @property
     def async_session(self) -> AsyncSession:
+        if self._async_session is None:
+            raise RuntimeError(
+                f"{type(self).__name__} has no async session; "
+                "construct it with async_session= or assign one before use"
+            )
         return self._async_session
+
+    @async_session.setter
+    def async_session(self, session: AsyncSession | None):
+        self._async_session = session
 
     @property
     def sync_session(self) -> Session:
+        if self._sync_session is None:
+            raise RuntimeError(
+                f"{type(self).__name__} has no sync session; "
+                "construct it with sync_session= or assign one before use"
+            )
         return self._sync_session
 
-    def repo(self, repository_cls: Type[TRepo], **kwargs) -> TRepo:
+    @sync_session.setter
+    def sync_session(self, session: Session | None):
+        self._sync_session = session
+
+    def repo(self, repository_cls: type[TRepo], **kwargs) -> TRepo:
         repo = self._repositories.get(repository_cls)
 
         if repo is None:

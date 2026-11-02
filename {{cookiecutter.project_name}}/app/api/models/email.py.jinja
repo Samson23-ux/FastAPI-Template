@@ -1,9 +1,9 @@
 import enum
 import uuid
-from datetime import datetime, timezone
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import DateTime, PrimaryKeyConstraint, UUID, String, Enum
+from datetime import UTC, datetime
 
+from sqlalchemy import UUID, DateTime, Enum, PrimaryKeyConstraint, String
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.api.models.base import Base
 from app.api.models.enum import EmailStatus
@@ -19,7 +19,7 @@ class Email(Base):
         default=EmailStatus.PENDING,
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

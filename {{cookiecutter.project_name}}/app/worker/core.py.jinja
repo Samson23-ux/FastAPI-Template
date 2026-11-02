@@ -1,20 +1,8 @@
-{% set use_http = cookiecutter.make_http_requests == "yes" %}
-
-{% if use_http %}
-from httpx import Client
-{% endif %}
-
-
-from app.core.config import get_settings
-from app.api.repo.otp import OtpRepository
-from app.api.services.otp import OtpService
-{% if use_http %}
-from app.api.services.request import Request
-{% endif %}
 from app.api.repo.email import EmailRepository
 from app.api.repo.redis import RedisRepository
 from app.api.services.email import EmailService
-from app.worker import get_db_session, get_redis_client
+from app.core.config import get_settings
+lazy from app.worker import get_db_session, get_redis_client
 
 SETTINGS = get_settings()
 
@@ -32,22 +20,3 @@ def get_email_service() -> EmailService:
     )
 
     return email_service
-
-
-def get_otp_service() -> OtpService:
-    session = next(get_db_session())
-    otp_service: OtpService = OtpService(
-        otp_repo=OtpRepository(sync_session=session),
-    )
-    return otp_service
-
-
-{% if use_http %}
-def raise_for_5xx(response):
-    response.raise_for_status()
-
-def get_request_service() -> Request:
-    return Request(
-        sync_client=Client(timeout=10.0, event_hooks={"response": [raise_for_5xx]})
-    )
-{% endif %}

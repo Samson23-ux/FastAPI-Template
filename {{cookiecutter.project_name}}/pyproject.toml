@@ -1,33 +1,38 @@
 [project]
-name = "{{ cookiecutter.project_slug }}"
+name = "cookiecutter.project_slug"
 version = "0.1.0"
 description = "{{ cookiecutter.api_description }}"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 dependencies = [
     "alembic",
-    "asgi-lifespan",
     "asyncpg",
-    {% if cookiecutter.auth_with_google == "yes" %}
     "authlib",
-    {% endif %}
     "celery",
     "fastapi[all]",
     "fastapi-limiter",
     "gevent",
+    "joserfc",
     "psycopg",
     "psycopg2",
     "pwdlib[argon2]",
     "pydantic-settings",
     "pyrate-limiter",
-    "pytest",
-    "pytest-asyncio",
-    "python-jose",
     "redis",
     "resend",
     "sentry-sdk",
     "sqlalchemy",
 ]
+
+[dependency-groups]
+dev = [
+    "asgi-lifespan",
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.uv]
+exclude-dependencies = ["pyyaml"]
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope= "session"
