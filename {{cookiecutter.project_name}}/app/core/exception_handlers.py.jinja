@@ -1,25 +1,24 @@
 {% set use_github = cookiecutter.auth_with_github == "yes" %}
-{% set use_http = cookiecutter.make_http_requests == "yes" %}
 
 from fastapi import FastAPI
 
-
 from app.core.exceptions import (
-    create_exception_handler,
-    ServerError,
     AuthenticationError,
-    UserExistsError,
-    InvalidOtpError,
-    UserNotFoundError,
-    CredentialError,
     AuthorizationError,
+    CredentialError,
+    GithubSignInError,
+    GoogleSignInError,
+    InvalidOtpError,
+    OauthSignInError,
+    OtpAttemptsExceededError,
+    ServerError,
     ServiceUnavailable,
-    {% if use_http %}
-    CheckTimeoutError,
-    {% endif %}
     {% if use_github %}
     UnverifiedEmailError,
     {% endif %}
+    UserExistsError,
+    UserNotFoundError,
+    create_exception_handler,
 )
 
 
@@ -32,7 +31,7 @@ class ExceptionHandler:
             ServerError,
             create_exception_handler(
                 status_code=500,
-                initial_detail={
+                detail={
                     "status": "error",
                     "message": "Oops! Something went wrong.",
                 },
@@ -43,9 +42,9 @@ class ExceptionHandler:
             ServiceUnavailable,
             create_exception_handler(
                 status_code=503,
-                initial_detail={
+                detail={
                     "status": "error",
-                    "message": "Service unavailble! Try again after five minutes",
+                    "message": "Service unavailable! Try again after five minutes",
                 },
             ),
         )
@@ -54,7 +53,7 @@ class ExceptionHandler:
             AuthenticationError,
             create_exception_handler(
                 status_code=401,
-                initial_detail={
+                detail={
                     "status": "error",
                     "message": "User not authenticated.",
                 },
@@ -65,9 +64,43 @@ class ExceptionHandler:
             exc_class_or_status_code=AuthorizationError,
             handler=create_exception_handler(
                 status_code=403,
-                initial_detail={
+                detail={
                     "status": "error",
                     "message": "User is not authorized to make the requested action",
+                },
+            ),
+        )
+
+        # TODO: Replace error message for google/github sign in error
+        self._app.add_exception_handler(
+            exc_class_or_status_code=GoogleSignInError,
+            handler=create_exception_handler(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": "User is not authorized to make the requested action",
+                },
+            ),
+        )
+
+        self._app.add_exception_handler(
+            exc_class_or_status_code=GithubSignInError,
+            handler=create_exception_handler(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": "User is not authorized to make the requested action",
+                },
+            ),
+        )
+
+        self._app.add_exception_handler(
+            exc_class_or_status_code=OauthSignInError,
+            handler=create_exception_handler(
+                status_code=403,
+                detail={
+                    "status": "error",
+                    "message": "Failed to sign-in with oauth",
                 },
             ),
         )
@@ -76,7 +109,7 @@ class ExceptionHandler:
             exc_class_or_status_code=UserExistsError,
             handler=create_exception_handler(
                 status_code=409,
-                initial_detail={
+                detail={
                     "status": "error",
                     "message": "User already exists with the provided email {user_email}",
                 },
@@ -84,9 +117,9 @@ class ExceptionHandler:
         )
 
         self._app.add_exception_handler(
-            InvalidOtpError,
-            create_exception_handler(
-                initial_detail={
+            exc_class_or_status_code=InvalidOtpError,
+            handler=create_exception_handler(
+                detail={
                     "status": "error",
                     "message": "Invalid otp received",
                 },
@@ -98,9 +131,19 @@ class ExceptionHandler:
             exc_class_or_status_code=UserNotFoundError,
             handler=create_exception_handler(
                 status_code=404,
-                initial_detail={
+                detail={
                     "status": "error",
-                    "message": "User not found with email {user_email}",
+                    "message": "User not found with id {user_id}",
+                },
+            ),
+        )
+
+        self._app.add_exception_handler(
+            exc_class_or_status_code=OtpAttemptsExceededError,
+            handler=create_exception_handler(
+                status_code=400,
+                detail={
+                    "message": "Too many wrong attempts. Request a new code to continue."
                 },
             ),
         )
@@ -108,7 +151,7 @@ class ExceptionHandler:
         self._app.add_exception_handler(
             CredentialError,
             create_exception_handler(
-                initial_detail={
+                detail={
                     "status": "error",
                     "message": "Invalid credentials!",
                 },
@@ -116,25 +159,12 @@ class ExceptionHandler:
             ),
         )
 
-        {% if use_http %}
-        self._app.add_exception_handler(
-            CheckTimeoutError,
-            create_exception_handler(
-                initial_detail={
-                    "status": "error",
-                    "message": "Ensure the device is connected to the internet",
-                },
-                status_code=408,
-            ),
-        )
-        {% endif %}
-
         {% if use_github %}
         self._app.add_exception_handler(
             exc_class_or_status_code=UnverifiedEmailError,
             handler=create_exception_handler(
                 status_code=400,
-                initial_detail={
+                detail={
                     "status": "error",
                     "message": "Email not verified",
                 },

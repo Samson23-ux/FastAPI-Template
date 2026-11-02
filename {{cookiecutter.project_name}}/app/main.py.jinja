@@ -1,18 +1,19 @@
 {% set oauth_supported = cookiecutter.auth_with_google == "yes" or cookiecutter.auth_with_github == "yes" %}
 
+from contextlib import asynccontextmanager
+
 import sentry_sdk
 from fastapi import FastAPI
-from contextlib import asynccontextmanager
 {% if oauth_supported %}
 from starlette.middleware.sessions import SessionMiddleware
 {% endif %}
 
-
 from app.api.routers import router
-from app.core.security import Security
 from app.core.config import get_settings
-from app.database.session import redis_client
 from app.core.exception_handlers import ExceptionHandler
+from app.core.security import Security
+from app.database.session import redis_client
+from app.middleware import RequestIdMiddleware
 
 SECURITY = Security()
 SETTINGS = get_settings()
@@ -21,7 +22,6 @@ SETTINGS = get_settings()
 sentry_sdk.init(
     dsn=SETTINGS.SENTRY_SDK_DSN,
     enable_logs=True,
-    send_default_pii=True,
     traces_sample_rate=1.0,
     profiles_sample_rate=1.0,
     profile_lifecycle="trace",
@@ -58,6 +58,8 @@ app.add_middleware(
     https_only=SETTINGS.ENVIRONMENT == "production",
 )
 {% endif %}
+
+app.add_middleware(RequestIdMiddleware)
 
 exception_handler = ExceptionHandler(app)
 exception_handler.add_handlers()
