@@ -1,22 +1,118 @@
-from redis.asyncio import Redis
+from collections.abc import Awaitable
+
 from redis import Redis as SyncRedis
+from redis.asyncio import Redis
+
+TOKEN_ROTATE_SCRIPT = """
+local token_id = redis.call('HGET', KEYS[1], ARGV[1])
+if not token_id then
+    return 0
+end
+if token_id ~= ARGV[2] then
+    redis.call('HDEL', KEYS[1], ARGV[1])
+    return -1
+end
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[3])
+redis.call('EXPIRE', KEYS[1], ARGV[4])
+return 1
+"""
+
+
+CONSUME_OTP_SCRIPT = """
+local code = redis.call('HGET', KEYS[1], ARGV[1])
+if not code then
+    return 0
+end
+if code == ARGV[2] then
+    redis.call('DEL', KEYS[1])
+    return 1
+end
+local attempts = redis.call('HINCRBY', KEYS[1], ARGV[3], 1)
+if attempts >= tonumber(ARGV[4]) then
+    redis.call('DEL', KEYS[1])
+    return -1
+end
+return -2
+"""
 
 
 class RedisRepository:
-    def __init__(self, async_redis: Redis = None, sync_redis: SyncRedis = None):
+    def __init__(
+        self, async_redis: Redis | None = None, sync_redis: SyncRedis | None = None
+    ):
         self._sync_redis = sync_redis
         self._async_redis = async_redis
 
-    async def create_hset(self, key: str, value: dict):
-        await self._async_redis.hset(key, mapping=value)
+    @property
+    def async_redis(self) -> Redis:
+        if self._async_redis is None:
+            raise RuntimeError(
+                f"{type(self).__name__} has no async redis; "
+                "construct it with async_redis= or assign one before use"
+            )
+        return self._async_redis
 
-    async def get_hset(self, key: str) -> dict:
+    @async_redis.setter
+    def async_redis(self, client: Redis | None):
+        self._async_redis = client
+
+    @property
+    def sync_redis(self) -> SyncRedis:
+        if self._sync_redis is None:
+            raise RuntimeError(
+                f"{type(self).__name__} has no sync redis; "
+                "construct it with sync_redis= or assign one before use"
+            )
+        return self._sync_redis
+
+    @sync_redis.setter
+    def sync_redis(self, client: SyncRedis | None):
+        self._sync_redis = client
+
+    async def create_hset(self, key: str, value: dict, ttl: int | None = None):
+        async with self._async_redis.pipeline(transaction=True) as pipe:
+            pipe.hset(key, mapping=value)
+            if ttl:
+                pipe.expire(key, ttl)
+            await pipe.execute()
+
+    async def delete_session(self, key: str, name: str):
+        await self._async_redis.hdel(key, name)
+
+    async def incr_key(self, key: str, ttl: int | None = None):
+        async with self._async_redis.pipeline(transaction=True) as pipe:
+            pipe.incr(key)
+            if ttl:
+                pipe.expire(key, ttl, nx=True)
+            new_value, _ = await pipe.execute()
+        return new_value
+
+    async def rotate_refresh_token(
+        self, key: str, name: str, expected_id: str, new_id: str, ttl: int
+    ) -> int:
+        script = self._async_redis.register_script(TOKEN_ROTATE_SCRIPT)
+        return await script(keys=[key], args=[name, expected_id, new_id, ttl])
+
+    async def consume_otp_code(
+        self,
+        key: str,
+        otp: str,
+        total_attempts: int,
+        otp_name: str = "code",
+        attempts_name: str = "attempts",
+    ) -> int:
+        script = self._async_redis.register_script(CONSUME_OTP_SCRIPT)
+        return await script(
+            keys=[key], args=[otp_name, otp, attempts_name, total_attempts]
+        )
+
+    async def get_hset(self, key: str) -> Awaitable[dict[bytes | str, bytes | str]]:
         return await self._async_redis.hgetall(key)
 
     async def delete_key(self, key: str):
         await self._async_redis.delete(key)
 
-    def get_idempotency_key(self, key: str) -> str | None:
+    def get_idempotency_key(self, key: str) -> bytes | str | None:
         return self._sync_redis.get(key)
 
     def mark_idempotency_key(self, key: str, value: str, ttl: int):

@@ -1,52 +1,74 @@
 {% set use_github = cookiecutter.auth_with_github == "yes" %}
 {% set use_google = cookiecutter.auth_with_google == "yes" %}
-
-{% if use_github %}
-from uuid import uuid4
-{% endif %}
-{% if use_github or use_google %}
-from fastapi.responses import RedirectResponse
+{% set oauth_supported = use_google or use_github %}
+{% if oauth_supported %}
+import sentry_sdk
+import sentry_sdk.logger as sentry_logger
+from authlib.integrations.base_client.errors import MismatchingStateError, OAuthError
 {% endif %}
 from fastapi import APIRouter, Request, Response
-
-
-from app.core.config import get_settings
-{% if use_github %}
-from app.core.exceptions import AuthorizationError
+{% if oauth_supported %}
+from fastapi.responses import RedirectResponse
 {% endif %}
+
+{% if oauth_supported %}
+from app.api.models.enum import OauthFailure
+{% endif %}
+from app.api.schemas.auth import (
+    EmailLogin,
+    EmailVerify,
+    LogoutResponse,
+    OtpResendResponse,
+    ResendOtp,
+    SignUpResponse,
+    Token,
+)
 from app.api.schemas.response import SuccessResponse
 from app.api.schemas.user import (
-    {% if use_google %}
-    GoogleUserResponse,
-    {% endif %}
     EmailUserResponse,
     {% if use_github %}
     GithubUserResponse,
     {% endif %}
-)
-from app.deps import (
-    {% if cookiecutter.make_http_requests == "yes" %}
-    RequestDep,
+    {% if use_google %}
+    GoogleUserResponse,
     {% endif %}
-    SecurityDep,
+)
+from app.core.config import get_settings
+{% if oauth_supported %}
+from app.core.exceptions import (
+    ErrorCode,
+    {% if use_github %}
+    GithubSignInError,
+    {% endif %}
+    {% if use_google %}
+    GoogleSignInError,
+    {% endif %}
+    OauthSignInError,
+)
+{% endif %}
+from app.deps import (
     AuthServiceDep,
-    UserServiceDep,
     CurrentActiveUser,
+    OtpServiceDep,
+    SecurityDep,
     UnitOfWorkRepo,
+    UserServiceDep,
     read_limiter,
     write_limiter,
 )
-from app.api.schemas.auth import (
-    SignUpResponse,
-    EmailLogin,
-    EmailVerify,
-    Token,
-    ResendOtp,
-    OtpResendResponse,
-    LogoutResponse,
-)
 
 router = APIRouter()
+
+
+SETTINGS = get_settings()
+
+
+def _refresh_expire() -> int:
+    return SETTINGS.REFRESH_TOKEN_EXPIRE_TIME * 24 * 3600
+
+
+def _secure_cookie() -> bool:
+    return SETTINGS.ENVIRONMENT == "production"
 
 
 @router.post(
@@ -63,16 +85,18 @@ async def sign_up_with_email(
     request: Request,
     security: SecurityDep,
     email_login: EmailLogin,
+    otp_service: OtpServiceDep,
     auth_service: AuthServiceDep,
     uow: UnitOfWorkRepo,
 ):
-    await auth_service.sign_up_with_email(email_login, security, uow)
+    await auth_service.sign_up_with_email(email_login, otp_service, security, uow)
     return SuccessResponse(
         message=(
             "Sign up completed successfully."
             "Check your email for verification code and instructions"
         )
     )
+
 
 {% if use_google %}
 @router.get(
@@ -83,8 +107,7 @@ async def sign_up_with_email(
     dependencies=[write_limiter],
 )
 async def sign_in_with_google(request: Request, security: SecurityDep):
-    redirect_uri = request.url_for("google_callback")
-    await security.register_oauth()
+    redirect_uri = SETTINGS.GOOGLE_CALLBACK_URL or request.url_for("google_callback")
     return await security.oauth.google.authorize_redirect(request, redirect_uri)
 
 
@@ -101,24 +124,53 @@ async def google_callback(
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
 ):
-    await security.register_oauth()
-    payload: dict = await security.oauth.google.authorize_access_token(request)
+    error: str | None = request.query_params.get("error")
+    if error:
+        failure = (
+            OauthFailure.ACCESS_DENIED
+            if error == "access_denied"
+            else OauthFailure.OAUTH_FAILED
+        )
+        code = (
+            ErrorCode.OAUTH_ACCESS_DENIED
+            if failure == "access_denied"
+            else ErrorCode.OAUTH_FAILED
+        )
+
+        raise GoogleSignInError(code=code, details={"reason": failure})
+
+    try:
+        payload = await security.oauth.google.authorize_access_token(request)
+    except MismatchingStateError as exc:
+        sentry_sdk.capture_exception(exc)
+        sentry_logger.error("State mismatch for google sign-in")
+        raise OauthSignInError(
+            code=ErrorCode.OAUTH_STATE_MISMATCH,
+            details={"reason": "State mismatch for google sign-in"},
+        ) from exc
+    except OAuthError as exc:
+        sentry_sdk.capture_exception(exc)
+        sentry_logger.error("Google oauth failed")
+        raise OauthSignInError(
+            code=ErrorCode.OAUTH_FAILED,
+            details={"reason": "Oauth failed for google sign-in"},
+        )
+
     access_token, refresh_token = await auth_service.sign_up_with_google(
         payload, user_service, security
     )
 
-    expire_time: int = get_settings().REFRESH_TOKEN_EXPIRE_TIME * 24 * 3600
-
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        max_age=expire_time,
-        secure=get_settings().ENVIRONMENT == "production",
+        max_age=_refresh_expire(),
+        secure=_secure_cookie(),
         samesite="lax",
     )
 
     return SuccessResponse(data=Token(access_token=access_token))
 {% endif %}
+
 
 {% if use_github %}
 @router.get(
@@ -129,24 +181,8 @@ async def google_callback(
     dependencies=[write_limiter],
 )
 async def sign_in_with_github(request: Request, security: SecurityDep):
-    state: str = str(uuid4())
-    code_verifier: str = await security.get_code_verifier()
-    code_challenge: str = await security.hash_code_challenge(code_verifier)
-
-    client_data: dict = {"state": state, "code_verifier": code_verifier}
-
-    request.session["client_data"] = client_data
-
-    url = (
-        f"{get_settings().GITHUB_AUTHORIZE_URL}"
-        f"?client_id={get_settings().GITHUB_CLIENT_ID}"
-        f"&redirect_uri={get_settings().GITHUB_CALLBACK_URL}"
-        f"&scope=read:user user:email"
-        f"&state={state}"
-        f"&code_challenge={code_challenge}"
-        f"&code_challenge_method=S256"
-    )
-    return RedirectResponse(url, 302)
+    redirect_uri = SETTINGS.GITHUB_CALLBACK_URL or request.url_for("github_callback")
+    return await security.oauth.github.authorize_redirect(request, redirect_uri)
 
 
 @router.get(
@@ -159,36 +195,50 @@ async def github_callback(
     request: Request,
     response: Response,
     security: SecurityDep,
-    http_request: RequestDep,
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
-    error: str = None,
-    state: str = None,
-    code: str = None,
 ):
-    saved_state = None
-    code_verifier = None
-
+    error: str | None = request.query_params.get("error")
     if error:
-        raise AuthorizationError()
+        failure = (
+            OauthFailure.ACCESS_DENIED
+            if error == "access_denied"
+            else OauthFailure.OAUTH_FAILED
+        )
+        code = (
+            ErrorCode.OAUTH_ACCESS_DENIED
+            if failure == "access_denied"
+            else ErrorCode.OAUTH_FAILED
+        )
 
-    client_data: dict = request.session.get("client_data")
+        raise GithubSignInError(code=code, details={"reason": failure})
 
-    if client_data:
-        saved_state: str = client_data.get("state")
-        code_verifier: str = client_data.get("code_verifier")
+    try:
+        token: str = await security.oauth.github.authorize_access_token(request)
+    except MismatchingStateError as exc:
+        sentry_sdk.capture_exception(exc)
+        sentry_logger.error("State mismatch for github sign-in")
+        raise OauthSignInError(
+            code=ErrorCode.OAUTH_STATE_MISMATCH,
+            details={"reason": "State mismatch for github sign-in"},
+        ) from exc
+    except OAuthError as exc:
+        sentry_sdk.capture_exception(exc)
+        sentry_logger.error("Github oauth failed")
+        raise OauthSignInError(
+            code=ErrorCode.OAUTH_FAILED,
+            details={"reason": "Oauth failed for github sign-in"},
+        )
 
     access_token, refresh_token = await auth_service.sign_up_with_github(
-        code, state, http_request, saved_state, code_verifier, security, user_service
+        token, security, user_service
     )
-
-    expire_time: int = get_settings().REFRESH_TOKEN_EXPIRE_TIME * 24 * 3600
 
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        max_age=expire_time,
-        secure=get_settings().ENVIRONMENT == "production",
+        max_age=_refresh_expire(),
+        secure=_secure_cookie(),
         samesite="lax",
     )
 
@@ -205,11 +255,12 @@ async def github_callback(
 )
 async def verify_account(
     request: Request,
-    uow: UnitOfWorkRepo,
     email_verify: EmailVerify,
+    user_service: UserServiceDep,
+    otp_service: OtpServiceDep,
     auth_service: AuthServiceDep,
 ):
-    await auth_service.verify_account(uow, email_verify)
+    await auth_service.verify_account(otp_service, user_service, email_verify)
     return SuccessResponse(message="User email verified successfully")
 
 
@@ -223,10 +274,11 @@ async def verify_account(
 async def resend_otp(
     request: Request,
     otp_resend: ResendOtp,
+    otp_service: OtpServiceDep,
     auth_service: AuthServiceDep,
     uow: UnitOfWorkRepo,
 ):
-    await auth_service.resend_otp(otp_resend, uow)
+    await auth_service.resend_otp(otp_resend, otp_service, uow)
     return SuccessResponse(
         message="OTP sent successfully. Check your email for instructions"
     )
@@ -251,13 +303,11 @@ async def login(
         email_login, user_service, security
     )
 
-    expire_time: int = get_settings().REFRESH_TOKEN_EXPIRE_TIME * 24 * 3600
-
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        max_age=expire_time,
-        secure=get_settings().ENVIRONMENT == "production",
+        max_age=_refresh_expire(),
+        secure=_secure_cookie(),
         samesite="lax",
     )
     return SuccessResponse(
@@ -276,20 +326,19 @@ async def create_new_token(
     request: Request,
     response: Response,
     security: SecurityDep,
+    user_service: UserServiceDep,
     auth_service: AuthServiceDep,
 ):
-    refresh_token: str = request.cookies.get("refresh_token")
+    refresh_token: str | None = request.cookies.get("refresh_token")
     access_token, refresh_token = await auth_service.create_auth_tokens(
-        refresh_token, security
+        refresh_token, user_service, security
     )
-
-    expire_time: int = get_settings().REFRESH_TOKEN_EXPIRE_TIME * 24 * 3600
 
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        max_age=expire_time,
-        secure=get_settings().ENVIRONMENT == "production",
+        max_age=_refresh_expire(),
+        secure=_secure_cookie(),
         samesite="lax",
     )
     return SuccessResponse(
@@ -302,7 +351,7 @@ async def create_new_token(
     status_code=200,
     description="Get current active user",
     response_model=SuccessResponse[
-        EmailUserResponse{% if use_google %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif %}
+        EmailUserResponse{% if use_google %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif +%}
     ],
     dependencies=[read_limiter],
 )
@@ -311,9 +360,9 @@ async def get_current_user(
     curr_user: CurrentActiveUser,
     auth_service: AuthServiceDep,
 ):
-    user: EmailUserResponse{% if use_google %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif %} = (
-        await auth_service.get_current_user(curr_user)
-    )
+    user: (
+        EmailUserResponse{% if use_google %} | GoogleUserResponse{% endif %}{% if use_github %} | GithubUserResponse{% endif +%}
+    ) = await auth_service.get_current_user(curr_user)
     return SuccessResponse(message="User retrieved successfully", data=user)
 
 
@@ -331,8 +380,8 @@ async def log_out(
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
 ):
-    refresh_token: str = request.cookies.get("refresh_token")
-    await auth_service.logout(curr_user, user_service, refresh_token, security)
+    refresh_token: str | None = request.cookies.get("refresh_token")
+    await auth_service.logout(curr_user, refresh_token, security, user_service)
     return SuccessResponse(message="Log out completed successfully")
 
 
@@ -349,5 +398,5 @@ async def delete_account(
     auth_service: AuthServiceDep,
     user_service: UserServiceDep,
 ):
-    refresh_token: str = request.cookies.get("refresh_token")
+    refresh_token: str | None = request.cookies.get("refresh_token")
     await auth_service.delete_account(curr_user, user_service, refresh_token, security)
