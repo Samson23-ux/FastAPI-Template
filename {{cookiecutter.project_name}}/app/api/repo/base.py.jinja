@@ -121,7 +121,7 @@ class BaseRepository(ABC, Generic[Entity, SqlAlchemyModel]):
             except (ValueError, AttributeError):
                 return
 
-            if cursor_payload["order"] != curr_order.lower():
+            if cursor_payload["order"] != curr_order:
                 return
 
             return cursor_payload
@@ -139,10 +139,12 @@ class BaseRepository(ABC, Generic[Entity, SqlAlchemyModel]):
         self,
         limit: int,
         sort: str | None = None,
-        order: str = "asc",
         cursor: str | None = None,
         **filters,
     ) -> dict:
+        """sort is a field name, prefixed with "-" for descending (e.g. "-created_at")"""
+        order, sort = self._parse_sort(sort)
+
         filter_conditions: list[Any] = self._get_filters(**filters)
         sort_fields, sort_column, sort_field = self._get_sort_fields(sort)
 
@@ -155,7 +157,7 @@ class BaseRepository(ABC, Generic[Entity, SqlAlchemyModel]):
         if not cursor_payload:
             """get records from the first record in db"""
 
-            if order.lower() == "desc":
+            if order == "desc":
                 order_by_columns.append(desc(sort_column))
                 order_by_columns.append(desc(self.model.id))
             else:
@@ -200,6 +202,7 @@ class BaseRepository(ABC, Generic[Entity, SqlAlchemyModel]):
 
         has_more: bool = len(records) > limit
 
+        next_cursor = None
         if records:
             sort_value = getattr(records[:limit][-1], sort_field)
 
@@ -210,7 +213,7 @@ class BaseRepository(ABC, Generic[Entity, SqlAlchemyModel]):
                 "sort_field": sort_field,
                 "sort_value": sort_value,
                 "last_id": str(records[:limit][-1].id),
-                "order": cursor_payload["order"] if cursor_payload else order.lower(),
+                "order": order,
             }
             next_cursor: str = await self.encode_cursor(payload)
 
@@ -229,6 +232,13 @@ class BaseRepository(ABC, Generic[Entity, SqlAlchemyModel]):
         await self.async_session.execute(
             update(self.model).values(fields_to_update).where(*filter_conditions)
         )
+
+    @staticmethod
+    def _parse_sort(sort: str | None) -> tuple[str, str | None]:
+        """splits "-field" into ("desc", "field") and "field" into ("asc", "field")"""
+        if sort and sort.startswith("-"):
+            return "desc", sort[1:]
+        return "asc", sort
 
     @abstractmethod
     def _entity_to_model(self, entity: Entity) -> SqlAlchemyModel:
