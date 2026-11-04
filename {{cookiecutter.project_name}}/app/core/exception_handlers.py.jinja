@@ -35,7 +35,7 @@ class ExceptionHandler:
         @self._app.exception_handler(RequestValidationError)
         async def validation_exception_handler(req, exc):
             details = {
-                ".".join(str(field) for field in err["loc"][:]):
+                ".".join(str(field) for field in err["loc"]):
                 err["msg"] for err in exc.errors()
             }
 
