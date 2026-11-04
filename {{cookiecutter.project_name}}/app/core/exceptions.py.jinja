@@ -49,6 +49,12 @@ class ErrorCode(StrEnum):
     INVALID_OTP = "INVALID_OTP"
     OTP_ATTEMPTS_EXCEEDED = "OTP_ATTEMPTS_EXCEEDED"
 
+    # validation
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+
+    # rate limit
+    RATE_LIMITED = "RATE_LIMITED"
+
 
 class AppException(Exception):
     """Base Exception class"""
@@ -180,6 +186,13 @@ class CredentialError(AppException):
 
     def __init__(self):
         super().__init__(ErrorCode.INVALID_CREDENTIALS)
+
+
+class RateLimitExceeded(AppException):
+    def __init__(self, retry_after: int):
+        super().__init__(ErrorCode.RATE_LIMITED)
+        self.retry_after = retry_after
+        self.headers = {"Retry-After": str(retry_after)}
 
 
 def create_exception_handler(

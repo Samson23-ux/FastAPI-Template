@@ -1,15 +1,20 @@
 {% set use_github = cookiecutter.auth_with_github == "yes" %}
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 
+from app.api.schemas.response import Error, ErrorResponse
 from app.core.exceptions import (
     AuthenticationError,
     AuthorizationError,
     CredentialError,
+    ErrorCode,
     GithubSignInError,
     GoogleSignInError,
     InvalidOtpError,
     OauthSignInError,
+    RateLimitExceeded,
     OtpAttemptsExceededError,
     ServerError,
     ServiceUnavailable,
@@ -27,6 +32,25 @@ class ExceptionHandler:
         self._app = app
 
     def add_handlers(self):
+        @self._app.exception_handler(RequestValidationError)
+        async def validation_exception_handler(req, exc):
+            details = {
+                ".".join(str(field) for field in err["loc"][:]):
+                err["msg"] for err in exc.errors()
+            }
+
+            return JSONResponse(
+                content=ErrorResponse(
+                    error=Error(
+                        code=ErrorCode.VALIDATION_ERROR,
+                        message="Some fields are missing or invalid. See details.",
+                        request_id=req.state.request_id,
+                        details=details
+                    )
+                ).model_dump(mode="json"),
+                status_code=422,
+            )
+
         self._app.add_exception_handler(
             ServerError,
             create_exception_handler(
@@ -156,6 +180,14 @@ class ExceptionHandler:
                     "message": "Invalid credentials!",
                 },
                 status_code=400,
+            ),
+        )
+
+        self._app.add_exception_handler(
+            RateLimitExceeded,
+            create_exception_handler(
+                429,
+                {"message": "Too many requests. Try again in {retry_after} seconds."},
             ),
         )
 

@@ -66,9 +66,14 @@ exception_handler.add_handlers()
 
 
 @app.get("/", status_code=200)
-async def home():
+async def home() -> dict:
     message: dict = {
         "status": "success",
         "message": "Welcome to {{ cookiecutter.api_title }}",
     }
     return message
+
+
+@app.get("/health", status_code=200)
+async def health() -> dict:
+    return {"status": "ok"}
