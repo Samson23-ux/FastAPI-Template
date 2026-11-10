@@ -16,6 +16,7 @@ from joserfc.jwk import OctKey
 from pwdlib.hashers.argon2 import Argon2Hasher
 
 from app.api.schemas.auth import TokenData
+from app.api.services.threads import Thread
 from app.core.config import get_settings
 from app.core.exceptions import TokenExpiredError
 
@@ -27,6 +28,7 @@ class Security:
     SETTINGS = get_settings()
 
     def __init__(self):
+        self.thread = Thread()
         {% if oauth_supported %}
         self.oauth: OAuth = self.OAUTH
         {% endif %}
@@ -41,8 +43,12 @@ class Security:
             iss={"essential": True, "value": self.SETTINGS.JWT_TOKEN_ISS},
         )
 
-    def _encode(self, payload: dict, key: str) -> str:
-        return jwt.encode(
+    async def validate_registry(self, token_type, claims):
+        await self.thread.register(self._get_registry(token_type).validate, claims)
+
+    async def _encode(self, payload: dict, key: str) -> str:
+        return await self.thread.register(
+            jwt.encode,
             {"alg": self.SETTINGS.JWT_ALGORITHM},
             payload,
             OctKey.import_key(key),
@@ -79,11 +85,13 @@ class Security:
 
     async def hash_password(self, password: str) -> str:
         password = password + self.SETTINGS.ARGON2_PASSWORD_PEPPER
-        return self.arg2_hasher.hash(password)
+        return await self.thread.register(self.arg2_hasher.hash, password)
 
     async def verify_password(self, password: str, hash_password: str) -> bool:
         password = password + self.SETTINGS.ARGON2_PASSWORD_PEPPER
-        return self.arg2_hasher.verify(password, hash_password)
+        return await self.thread.register(
+            self.arg2_hasher.verify, password, hash_password
+        )
 
     async def create_access_token(
         self, token_data: TokenData, expire_time: int | None = None
@@ -106,7 +114,7 @@ class Security:
             "sid": str(token_data.session_id),
         }
 
-        return self._encode(payload, self.SETTINGS.ACCESS_TOKEN_SECRET_KEY)
+        return await self._encode(payload, self.SETTINGS.ACCESS_TOKEN_SECRET_KEY)
 
     async def create_refresh_token(
         self, token_data: TokenData, expire_time: int | None = None
@@ -130,19 +138,23 @@ class Security:
             "sid": str(token_data.session_id),
         }
 
-        return self._encode(payload, self.SETTINGS.REFRESH_TOKEN_SECRET_KEY), payload[
-            "jti"
-        ]
+        return await self._encode(
+            payload, self.SETTINGS.REFRESH_TOKEN_SECRET_KEY
+        ), payload["jti"]
 
     async def decode_token(self, token: str, key: str, token_type: str):
         try:
             if token is None:
                 return
 
-            decoded = jwt.decode(
-                token, OctKey.import_key(key), algorithms=[self.SETTINGS.JWT_ALGORITHM]
+            decoded = await self.thread.register(
+                jwt.decode,
+                token,
+                OctKey.import_key(key),
+                algorithms=[self.SETTINGS.JWT_ALGORITHM],
             )
-            self._get_registry(token_type).validate(decoded.claims)
+
+            await self.validate_registry(token_type, decoded.claims)
             return decoded.claims
         except ExpiredTokenError as exc:
             raise TokenExpiredError() from exc

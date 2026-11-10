@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from uuid import UUID
 
 import psycopg2
 from celery.exceptions import Reject
@@ -22,7 +21,6 @@ def send_email(
     self,
     email_subject: str,
     email_message: str,
-    email_id: UUID,
     recipient_email: str,
 ):
     try:
@@ -33,7 +31,7 @@ def send_email(
             SENDER_EMAIL, recipient_email, email_subject, email_message, self.request.id
         )
 
-        email: Email | None = email_service.get_processed_email(email_id)
+        email: Email | None = email_service.get_processed_email(self.request.id)
 
         if email:
             email.status = EmailStatus.DELIVERED
