@@ -33,18 +33,21 @@ def main() -> None:
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write(cleaned)
 
-    if "{{ cookiecutter.make_http_requests }}" == "no":
+    if "{{ cookiecutter.make_http_requests }}" == "no":  # noqa: PLR0133
         path = project_dir / "app" / "api" / "services" / "request.py"
         if path.exists():
             path.unlink()
 
-    if "{{ cookiecutter.auth_with_github }}" == "no" and "{{ cookiecutter.auth_with_google }}" == "no":
+    if (
+        "{{ cookiecutter.auth_with_github }}" == "no"  # noqa: PLR0133
+        and "{{ cookiecutter.auth_with_google }}" == "no"  # noqa: PLR0133
+    ):
         path = project_dir / "app" / "util.py"
         if path.exists():
             path.unlink()
 
-    subprocess.run(["uv", "sync"], cwd=project_dir)
-    subprocess.run(["uvx", "black", "."], cwd=project_dir)
+    subprocess.run(["uv", "sync"], check=False, cwd=project_dir)
+    subprocess.run(["uvx", "ruff", "."], check=False, cwd=project_dir)
 
 
 if __name__ == "__main__":
