@@ -47,7 +47,7 @@ def main() -> None:
             path.unlink()
 
     subprocess.run(["uv", "sync"], check=False, cwd=project_dir)
-    subprocess.run(["uvx", "ruff", "."], check=False, cwd=project_dir)
+    subprocess.run(["uvx", "ruff", "check", "."], check=False, cwd=project_dir)
 
 
 if __name__ == "__main__":
